@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+:root {
+  --globant-lime: #bfd732;
+  --globant-dark: #00292e;
+  --globant-dark-hover: #013940;
+  --globant-mint: #38efa0;
+  --surface: #ffffff;
+  --surface-muted: #f5f6f7;
+  --text-primary: #00292e;
+  --text-secondary: #666666;
+  --border: #dfe5e4;
+  --border-strong: #c7d0ce;
+  --success: #14734f;
+  --warning: #9a6500;
+  --danger: #b3261e;
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 28px;
+  --shadow-soft: 0 14px 40px rgb(0 41 46 / 8%);
+  --transition-fast: 180ms ease;
+  --background: var(--surface);
+  --foreground: var(--text-primary);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-heebo), Arial, Helvetica, sans-serif;
+}
+
+button {
+  font: inherit;
+}
+
+a,
+button,
+input {
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--globant-mint);
+  outline-offset: 3px;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background: var(--surface);
+}
+
+.app-container {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 32px 20px 56px;
+}
+
+.brand-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.brand-card-muted {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-muted);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--globant-dark);
+  color: var(--surface);
+  font-weight: 700;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  background: var(--globant-dark-hover);
+}
+
+.btn-accent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--globant-lime);
+  color: var(--globant-dark);
+  font-weight: 800;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--globant-dark);
+  font-weight: 700;
+}
+
+.btn-secondary:hover {
+  border-color: var(--globant-dark);
+  transform: translateY(-1px);
+}
+
+.eyebrow {
+  color: var(--globant-dark);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.muted-text {
+  color: var(--text-secondary);
+}
+
+.brand-pill {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+}
