@@ -1,13 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AuthenticatedNav } from "@/components/navigation/authenticated-nav";
+import { AppLayout } from "@/components/navigation/app-layout";
 import { ScoreCard } from "@/components/scores/score-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingState } from "@/components/ui/loading-state";
-import { MetricCard } from "@/components/ui/metric-card";
-import { ApiError } from "@/lib/api/api-client";
+import { PageHeader } from "@/components/ui/page-header";
+import {
+  ConnectionNotice,
+  SessionFallback,
+} from "@/components/ui/connection-notice";
+import { ApiError, NetworkError } from "@/lib/api/api-client";
+import { useConnection } from "@/lib/api/connection-context";
 import { useAuthContext } from "@/features/auth/hooks/auth-context";
 import { getMyScores } from "@/features/scores/api/scores-api";
 import type { PredictionScoreResponse } from "@/features/scores/types/score-types";
@@ -16,22 +22,27 @@ import type { TournamentResponse } from "@/features/tournaments/types/tournament
 
 export default function ScoresPage() {
   const router = useRouter();
-  const { accessToken, authenticated, loading, logout } = useAuthContext();
+  const { accessToken, authenticated, hasStoredSession, loading, logout } =
+    useAuthContext();
+  const { offline, reportNetworkError, reportSuccess, retryNonce } =
+    useConnection();
   const [tournament, setTournament] = useState<TournamentResponse | null>(null);
   const [scores, setScores] = useState<PredictionScoreResponse[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && !authenticated) {
+    if (!loading && !authenticated && !hasStoredSession) {
       router.replace("/login");
     }
-  }, [authenticated, loading, router]);
+  }, [authenticated, hasStoredSession, loading, router]);
 
   useEffect(() => {
     if (loading || !authenticated || !accessToken) {
       return;
     }
+
+    const token = accessToken;
 
     async function loadScores() {
       setPageLoading(true);
@@ -42,7 +53,7 @@ export default function ScoresPage() {
         setTournament(activeTournament);
         const scoreResponses = await getMyScores(
           activeTournament.id,
-          accessToken,
+          token,
         );
         setScores(
           [...scoreResponses].sort(
@@ -51,7 +62,13 @@ export default function ScoresPage() {
               new Date(first.scoredAt).getTime(),
           ),
         );
+        reportSuccess();
       } catch (loadError) {
+        if (loadError instanceof NetworkError) {
+          reportNetworkError();
+          return;
+        }
+
         if (loadError instanceof ApiError && loadError.status === 401) {
           logout();
           router.replace("/login");
@@ -70,7 +87,16 @@ export default function ScoresPage() {
     }
 
     void loadScores();
-  }, [accessToken, authenticated, loading, logout, router]);
+  }, [
+    accessToken,
+    authenticated,
+    loading,
+    logout,
+    reportNetworkError,
+    reportSuccess,
+    retryNonce,
+    router,
+  ]);
 
   const summary = useMemo(
     () => ({
@@ -87,72 +113,104 @@ export default function ScoresPage() {
   );
 
   if (loading || !authenticated) {
-    return (
-      <main className="flex min-h-screen items-center justify-center px-5">
-        <p className="text-sm text-[var(--text-secondary)]">
-          Preparando tu sesión...
-        </p>
-      </main>
-    );
+    return <SessionFallback />;
   }
 
   return (
-    <main className="app-shell">
-      <AuthenticatedNav />
-      <section className="app-container">
-        <header className="mb-8">
-          <p className="eyebrow mb-2">
-            {tournament?.name ?? "Torneo activo"}
-          </p>
-          <h1 className="text-4xl font-extrabold text-[var(--globant-dark)]">
-            Mis puntos
-          </h1>
-          <p className="mt-3 max-w-2xl text-[var(--text-secondary)]">
-            Detalle de tus partidos puntuados, con aciertos y bonus ya
-            calculados por el backend.
-          </p>
-        </header>
+    <AppLayout>
+      <div className="app-stack">
+        <PageHeader
+          description="Detalle de tus partidos puntuados, con aciertos y bonus ya calculados por el backend."
+          eyebrow={tournament?.name ? tournament.name.toUpperCase() : "WORLD CUP 2026"}
+          title="Mis puntos"
+        />
 
         {pageLoading ? (
-          <LoadingState label="Cargando tus puntos..." />
+          <LoadingState label="Cargando tus puntos..." rows={4} />
         ) : null}
 
-        {error ? (
-          <p className="rounded-[var(--radius-sm)] border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            {error}
-          </p>
-        ) : null}
+        {offline ? <ConnectionNotice /> : null}
 
-        {!pageLoading && !error ? (
+        {error && !offline ? <p className="app-alert">{error}</p> : null}
+
+        {!pageLoading && !error && !offline ? (
           <>
-            <section className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <MetricCard label="Puntos acumulados" value={summary.totalPoints} />
-              <MetricCard
-                label="Partidos puntuados"
-                tone="mint"
-                value={summary.scoredPredictions}
-              />
-              <MetricCard label="Exactos" value={summary.exactScores} />
-              <MetricCard
-                label="Resultados correctos"
-                tone="dark"
-                value={summary.correctOutcomes}
-              />
-              <MetricCard label="Bonus" tone="mint" value={summary.qualifiedBonuses} />
+            {/* Fila de 5 Tarjetas de Métricas idénticas al diseño adjunto */}
+            <section className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+              <div className="brand-card p-5 transition-all hover:shadow-sm">
+                <div className="mb-4 h-1.5 w-8 rounded-full bg-[var(--globant-lime)]" />
+                <p className="label-caps">
+                  PUNTOS ACUMULADOS
+                </p>
+                <p className="mt-2 text-3xl font-black text-[var(--text-primary)]">
+                  {summary.totalPoints}
+                </p>
+              </div>
+
+              <div className="brand-card p-5 transition-all hover:shadow-sm">
+                <div className="mb-4 h-1.5 w-8 rounded-full bg-[var(--globant-mint)]" />
+                <p className="label-caps">
+                  PARTIDOS PUNTUADOS
+                </p>
+                <p className="mt-2 text-3xl font-black text-[var(--text-primary)]">
+                  {summary.scoredPredictions}
+                </p>
+              </div>
+
+              <div className="brand-card p-5 transition-all hover:shadow-sm">
+                <div className="mb-4 h-1.5 w-8 rounded-full bg-[var(--globant-lime)]" />
+                <p className="label-caps">
+                  EXACTOS
+                </p>
+                <p className="mt-2 text-3xl font-black text-[var(--text-primary)]">
+                  {summary.exactScores}
+                </p>
+              </div>
+
+              <div className="brand-card p-5 transition-all hover:shadow-sm">
+                <div className="mb-4 h-1.5 w-8 rounded-full bg-[var(--text-primary)]" />
+                <p className="label-caps">
+                  RESULTADOS CORRECTOS
+                </p>
+                <p className="mt-2 text-3xl font-black text-[var(--text-primary)]">
+                  {summary.correctOutcomes}
+                </p>
+              </div>
+
+              <div className="brand-card p-5 transition-all hover:shadow-sm">
+                <div className="mb-4 h-1.5 w-8 rounded-full bg-[var(--globant-mint)]" />
+                <p className="label-caps">
+                  BONUS
+                </p>
+                <p className="mt-2 text-3xl font-black text-[var(--text-primary)]">
+                  {summary.qualifiedBonuses}
+                </p>
+              </div>
             </section>
 
             {scores.length === 0 ? (
-              <EmptyState title="Todavía no tenés partidos puntuados." />
+              <EmptyState
+                action={
+                  <Link
+                    className="btn-accent px-5 py-2.5 text-sm"
+                    href="/matches"
+                  >
+                    Ir al fixture
+                  </Link>
+                }
+                description="En cuanto se puntúe un partido que hayas pronosticado vas a ver acá el detalle de tus aciertos."
+                title="Todavía no tenés partidos puntuados"
+              />
             ) : (
-              <div className="grid gap-3">
+              <section className="grid gap-3">
                 {scores.map((score) => (
                   <ScoreCard key={score.id} score={score} />
                 ))}
-              </div>
+              </section>
             )}
           </>
         ) : null}
-      </section>
-    </main>
+      </div>
+    </AppLayout>
   );
 }

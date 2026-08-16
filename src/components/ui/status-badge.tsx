@@ -11,18 +11,14 @@ const statusLabels: Record<MatchResponse["status"], string> = {
 };
 
 const statusClasses: Record<MatchResponse["status"], string> = {
-  OPEN_FOR_PREDICTIONS:
-    "border-[var(--globant-lime)] bg-[rgb(191_215_50_/_18%)] text-[var(--globant-dark)]",
-  PREDICTION_CLOSED:
-    "border-[var(--border-strong)] bg-[var(--surface-muted)] text-[var(--globant-dark)]",
-  IN_PROGRESS:
-    "border-[var(--globant-mint)] bg-[rgb(56_239_160_/_16%)] text-[var(--globant-dark)]",
-  FINISHED:
-    "border-[var(--border-strong)] bg-[var(--surface-muted)] text-[var(--text-secondary)]",
-  SCORED:
-    "border-[var(--globant-lime)] bg-[rgb(191_215_50_/_18%)] text-[var(--globant-dark)]",
-  POSTPONED: "border-amber-300 bg-amber-50 text-amber-800",
-  CANCELLED: "border-red-200 bg-red-50 text-red-800",
+  OPEN_FOR_PREDICTIONS: "tag tag-lime",
+  PREDICTION_CLOSED: "tag",
+  IN_PROGRESS: "tag tag-mint",
+  FINISHED: "tag",
+  SCORED: "tag tag-lime",
+  POSTPONED:
+    "tag border-[rgba(217,119,6,0.35)] bg-[rgba(240,197,72,0.16)] text-[var(--warning)]",
+  CANCELLED: "tag tag-danger",
 };
 
 type StatusBadgeProps = {
@@ -34,10 +30,16 @@ export function statusLabel(status: MatchResponse["status"]): string {
 }
 
 export function StatusBadge({ status }: StatusBadgeProps) {
+  const live = status === "IN_PROGRESS";
+
   return (
-    <span
-      className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${statusClasses[status]}`}
-    >
+    <span className={statusClasses[status]}>
+      {live ? (
+        <span
+          aria-hidden="true"
+          className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--globant-mint)]"
+        />
+      ) : null}
       {statusLabels[status]}
     </span>
   );

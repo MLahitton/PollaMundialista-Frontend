@@ -5,52 +5,85 @@ type ScoreCardProps = {
   score: PredictionScoreResponse;
 };
 
-function scoreLabel(score: PredictionScoreResponse): string {
+function outcomeTag(score: PredictionScoreResponse): {
+  label: string;
+  className: string;
+} {
   if (score.exactScore) {
-    return "Marcador exacto";
+    return {
+      label: "Marcador exacto",
+      className:
+        "inline-flex items-center rounded-full border border-[rgba(191,215,50,0.6)] bg-[var(--lime-soft)] px-3 py-1 text-xs font-black text-[var(--accent-ink)]",
+    };
   }
 
   if (score.correctOutcome) {
-    return "Resultado correcto";
+    return {
+      label: "Resultado correcto",
+      className:
+        "inline-flex items-center rounded-full border border-[rgba(34,197,94,0.3)] bg-[var(--success-soft)] px-3 py-1 text-xs font-black text-[var(--success)]",
+    };
   }
 
-  return "Sin puntos";
+  return {
+    label: "Sin puntos",
+    className:
+      "inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-1 text-xs font-bold text-[var(--text-secondary)]",
+  };
 }
 
 export function ScoreCard({ score }: ScoreCardProps) {
+  const outcome = outcomeTag(score);
+
   return (
-    <article className="brand-card p-5">
+    <article className="brand-card p-6 transition-all hover:shadow-md">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <span className="inline-flex rounded-full bg-[rgb(191_215_50_/_18%)] px-3 py-1 text-xs font-bold text-[var(--globant-dark)]">
-            {scoreLabel(score)}
-          </span>
-          <div className="mt-4 grid gap-2 text-sm text-[var(--text-secondary)] sm:grid-cols-2">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={outcome.className}>{outcome.label}</span>
+            {score.correctQualifiedTeam ? (
+              <span className="inline-flex items-center rounded-full border border-[rgba(34,197,94,0.3)] bg-[var(--success-soft)] px-3 py-1 text-xs font-black text-[var(--success)]">
+                Clasificado acertado
+              </span>
+            ) : null}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-semibold text-[var(--text-secondary)]">
             <p>
               Pronóstico{" "}
-              <span className="font-extrabold text-[var(--globant-dark)]">
+              <span className="font-black text-[var(--text-primary)]">
                 {score.predictedHomeScore} - {score.predictedAwayScore}
               </span>
             </p>
+            <span className="hidden text-[var(--border-strong)] sm:inline">•</span>
             <p>
               Resultado{" "}
-              <span className="font-extrabold text-[var(--globant-dark)]">
+              <span className="font-black text-[var(--text-primary)]">
                 {score.actualHomeScore} - {score.actualAwayScore}
               </span>
             </p>
+            {score.qualifiedTeamBonus > 0 ? (
+              <>
+                <span className="hidden text-[var(--border-strong)] sm:inline">•</span>
+                <p>
+                  Bonus{" "}
+                  <span className="font-black text-[var(--success)]">
+                    +{score.qualifiedTeamBonus}
+                  </span>
+                </p>
+              </>
+            ) : null}
           </div>
-          {score.qualifiedTeamBonus > 0 ? (
-            <p className="mt-2 text-sm font-bold text-[var(--success)]">
-              +{score.qualifiedTeamBonus} por clasificado
-            </p>
-          ) : null}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-          <p className="text-2xl font-extrabold text-[var(--globant-dark)]">
-            +{score.totalPoints} pts
+        <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end sm:justify-center">
+          <p className="text-3xl font-black text-[var(--text-primary)]">
+            +{score.totalPoints}
           </p>
-          <Link className="btn-secondary px-4 py-2 text-sm" href={`/matches/${score.matchId}`}>
+          <Link
+            className="btn-secondary px-4 py-1.5 text-xs font-bold"
+            href={`/matches/${score.matchId}`}
+          >
             Ver partido
           </Link>
         </div>

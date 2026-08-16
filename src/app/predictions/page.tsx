@@ -3,10 +3,16 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AuthenticatedNav } from "@/components/navigation/authenticated-nav";
+import { AppLayout } from "@/components/navigation/app-layout";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingState } from "@/components/ui/loading-state";
-import { ApiError } from "@/lib/api/api-client";
+import { PageHeader } from "@/components/ui/page-header";
+import {
+  ConnectionNotice,
+  SessionFallback,
+} from "@/components/ui/connection-notice";
+import { ApiError, NetworkError } from "@/lib/api/api-client";
+import { useConnection } from "@/lib/api/connection-context";
 import { useAuthContext } from "@/features/auth/hooks/auth-context";
 import { getMyPredictions } from "@/features/predictions/api/predictions-api";
 import type { PredictionResponse } from "@/features/predictions/types/prediction-types";
@@ -32,22 +38,27 @@ function dateKey(value: string): string {
 
 export default function PredictionsPage() {
   const router = useRouter();
-  const { accessToken, authenticated, loading, logout } = useAuthContext();
+  const { accessToken, authenticated, hasStoredSession, loading, logout } =
+    useAuthContext();
+  const { offline, reportNetworkError, reportSuccess, retryNonce } =
+    useConnection();
   const [tournament, setTournament] = useState<TournamentResponse | null>(null);
   const [predictions, setPredictions] = useState<PredictionResponse[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && !authenticated) {
+    if (!loading && !authenticated && !hasStoredSession) {
       router.replace("/login");
     }
-  }, [authenticated, loading, router]);
+  }, [authenticated, hasStoredSession, loading, router]);
 
   useEffect(() => {
     if (loading || !authenticated || !accessToken) {
       return;
     }
+
+    const token = accessToken;
 
     async function loadPredictions() {
       setPageLoading(true);
@@ -56,8 +67,14 @@ export default function PredictionsPage() {
       try {
         const activeTournament = await getActiveTournament();
         setTournament(activeTournament);
-        setPredictions(await getMyPredictions(activeTournament.id, accessToken));
+        setPredictions(await getMyPredictions(activeTournament.id, token));
+        reportSuccess();
       } catch (loadError) {
+        if (loadError instanceof NetworkError) {
+          reportNetworkError();
+          return;
+        }
+
         if (loadError instanceof ApiError && loadError.status === 401) {
           logout();
           router.replace("/login");
@@ -71,7 +88,16 @@ export default function PredictionsPage() {
     }
 
     void loadPredictions();
-  }, [accessToken, authenticated, loading, logout, router]);
+  }, [
+    accessToken,
+    authenticated,
+    loading,
+    logout,
+    reportNetworkError,
+    reportSuccess,
+    retryNonce,
+    router,
+  ]);
 
   const predictionsByDate = useMemo(() => {
     return predictions.reduce<Map<string, PredictionResponse[]>>(
@@ -86,101 +112,131 @@ export default function PredictionsPage() {
   }, [predictions]);
 
   if (loading || !authenticated) {
-    return (
-      <main className="flex min-h-screen items-center justify-center px-5">
-        <p className="text-sm text-[var(--text-secondary)]">
-          Preparando tu sesión...
-        </p>
-      </main>
-    );
+    return <SessionFallback />;
   }
 
+  const editableCount = predictions.filter((item) => item.editable).length;
+
   return (
-    <main className="app-shell">
-      <AuthenticatedNav />
-      <section className="app-container">
-        <header className="mb-8">
-          <p className="eyebrow mb-2">
-            {tournament?.name ?? "Torneo activo"}
-          </p>
-          <h1 className="text-4xl font-extrabold text-[var(--globant-dark)]">
-            Mis pronósticos
-          </h1>
-          <p className="mt-3 max-w-2xl text-[var(--text-secondary)]">
-            Tu selección de marcadores para el torneo activo, lista para editar
-            mientras la ventana siga abierta.
-          </p>
-        </header>
+    <AppLayout>
+      <div className="app-stack">
+        <PageHeader
+          aside={
+            !pageLoading && predictions.length > 0 ? (
+              <div className="flex gap-3">
+                <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] px-5 py-4 text-center">
+                  <p className="text-2xl font-black leading-none text-[var(--text-primary)]">
+                    {predictions.length}
+                  </p>
+                  <p className="mt-2 label-caps">
+                    Registrados
+                  </p>
+                </div>
+                <div className="rounded-[var(--radius-md)] border border-[rgba(56,239,160,0.35)] bg-[rgba(56,239,160,0.12)] px-5 py-4 text-center">
+                  <p className="text-2xl font-black leading-none text-[var(--success)]">
+                    {editableCount}
+                  </p>
+                  <p className="mt-2 label-caps">
+                    Editables
+                  </p>
+                </div>
+              </div>
+            ) : null
+          }
+          description="Tu selección de marcadores para el torneo activo, lista para editar mientras la ventana siga abierta."
+          eyebrow={tournament?.name ?? "Torneo activo"}
+          title="Mis pronósticos"
+        />
 
-        {pageLoading ? (
-          <LoadingState label="Cargando pronósticos..." />
+        {pageLoading ? <LoadingState label="Cargando pronósticos..." /> : null}
+
+        {offline ? <ConnectionNotice /> : null}
+
+        {error && !offline ? <p className="app-alert">{error}</p> : null}
+
+        {!pageLoading && !error && !offline && predictions.length === 0 ? (
+          <EmptyState
+            action={
+              <Link className="btn-accent px-5 py-2.5 text-sm" href="/matches">
+                Ir al fixture
+              </Link>
+            }
+            description="Cargá tu primer marcador desde el fixture y empezá a sumar puntos en la polla."
+            title="Todavía no tenés pronósticos"
+          />
         ) : null}
 
-        {error ? (
-          <p className="rounded-[var(--radius-sm)] border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            {error}
-          </p>
-        ) : null}
-
-        {!pageLoading && !error && predictions.length === 0 ? (
-          <EmptyState title="Todavía no tenés pronósticos." />
-        ) : null}
-
-        <div className="grid gap-8">
+        <div className="grid gap-10">
           {Array.from(predictionsByDate.entries()).map(
             ([date, datePredictions]) => (
               <section key={date}>
-                <h2 className="mb-3 text-sm font-extrabold uppercase tracking-wide text-[var(--globant-dark)]">
-                  {date}
-                </h2>
-                <div className="grid gap-3">
-                  {datePredictions.map((prediction) => (
-                    <article className="brand-card p-5" key={prediction.id}>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-bold text-[var(--globant-dark)]">
-                    {formatDateTime(prediction.startsAt)}
-                  </p>
-                  <h2 className="mt-2 text-xl font-extrabold text-[var(--globant-dark)]">
-                    {prediction.homeTeamName ?? "Local"} vs{" "}
-                    {prediction.awayTeamName ?? "Visitante"}
+                <div className="mb-4 flex items-center gap-4">
+                  <h2 className="text-sm font-black uppercase tracking-[0.14em] text-[var(--accent-ink)]">
+                    {date}
                   </h2>
-                  <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                    Pronóstico{" "}
-                    <span className="font-extrabold text-[var(--globant-dark)]">
-                      {prediction.predictedHomeScore} -{" "}
-                      {prediction.predictedAwayScore}
-                    </span>
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
                   <span
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${
-                      prediction.locked
-                        ? "bg-[var(--surface-muted)] text-[var(--text-secondary)]"
-                        : "bg-[rgb(56_239_160_/_16%)] text-[var(--globant-dark)]"
-                    }`}
-                  >
-                    {prediction.locked ? "Cerrado" : "Editable"}
-                  </span>
-                  {prediction.editable ? (
-                    <Link
-                      className="btn-primary px-4 py-2 text-sm"
-                      href={`/matches/${prediction.matchId}`}
-                    >
-                      Editar
-                    </Link>
-                  ) : null}
+                    aria-hidden="true"
+                    className="h-px flex-1 bg-[linear-gradient(90deg,rgba(191,215,50,0.55)_0%,var(--border)_100%)]"
+                  />
                 </div>
-              </div>
-            </article>
+                <div className="grid gap-4 xl:grid-cols-2">
+                  {datePredictions.map((prediction) => (
+                    <article
+                      className="brand-card brand-card-link p-5"
+                      key={prediction.id}
+                    >
+                      <div className="mb-4 flex flex-wrap items-center gap-2">
+                        <span className="tag">
+                          {formatDateTime(prediction.startsAt)}
+                        </span>
+                        <span
+                          className={
+                            prediction.locked ? "tag" : "tag tag-mint"
+                          }
+                        >
+                          {prediction.locked ? "Cerrado" : "Editable"}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                        <p className="line-clamp-2 text-sm font-extrabold leading-tight text-[var(--text-primary)] sm:text-base">
+                          {prediction.homeTeamName ?? "Local"}
+                        </p>
+                        <p className="shrink-0 text-[clamp(1.6rem,1.2rem+1vw,2.2rem)] font-black leading-none tabular-nums text-[var(--success)]">
+                          {prediction.predictedHomeScore}
+                          <span className="mx-1.5 text-[var(--text-faint)]">
+                            -
+                          </span>
+                          {prediction.predictedAwayScore}
+                        </p>
+                        <p className="line-clamp-2 text-right text-sm font-extrabold leading-tight text-[var(--text-primary)] sm:text-base">
+                          {prediction.awayTeamName ?? "Visitante"}
+                        </p>
+                      </div>
+
+                      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-4">
+                        <p className="text-xs text-[var(--text-faint)]">
+                          Cierra: {formatDateTime(prediction.predictionClosesAt)}
+                        </p>
+                        <Link
+                          className={
+                            prediction.editable
+                              ? "btn-primary px-4 py-2 text-sm"
+                              : "btn-secondary px-4 py-2 text-sm"
+                          }
+                          href={`/matches/${prediction.matchId}`}
+                        >
+                          {prediction.editable ? "Editar" : "Ver partido"}
+                        </Link>
+                      </div>
+                    </article>
                   ))}
                 </div>
               </section>
             ),
           )}
         </div>
-      </section>
-    </main>
+      </div>
+    </AppLayout>
   );
 }

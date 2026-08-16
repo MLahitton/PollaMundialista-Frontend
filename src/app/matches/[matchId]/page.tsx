@@ -3,13 +3,18 @@
 import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AuthenticatedNav } from "@/components/navigation/authenticated-nav";
+import { AppLayout } from "@/components/navigation/app-layout";
 import { PredictionForm } from "@/components/predictions/prediction-form";
 import { PublicPredictionCard } from "@/components/predictions/public-prediction-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingState } from "@/components/ui/loading-state";
 import { StatusBadge, statusLabel } from "@/components/ui/status-badge";
-import { ApiError } from "@/lib/api/api-client";
+import {
+  ConnectionNotice,
+  SessionFallback,
+} from "@/components/ui/connection-notice";
+import { ApiError, NetworkError } from "@/lib/api/api-client";
+import { useConnection } from "@/lib/api/connection-context";
 import { useAuthContext } from "@/features/auth/hooks/auth-context";
 import { getMatch } from "@/features/matches/api/matches-api";
 import type { MatchResponse } from "@/features/matches/types/match-types";
@@ -58,8 +63,16 @@ function qualifiedTeamName(match: MatchResponse): string | null {
 export default function MatchDetailPage({ params }: MatchDetailPageProps) {
   const { matchId } = use(params);
   const router = useRouter();
-  const { accessToken, authenticated, loading, logout, participant } =
-    useAuthContext();
+  const {
+    accessToken,
+    authenticated,
+    hasStoredSession,
+    loading,
+    logout,
+    participant,
+  } = useAuthContext();
+  const { offline, reportNetworkError, reportSuccess, retryNonce } =
+    useConnection();
   const [match, setMatch] = useState<MatchResponse | null>(null);
   const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
   const [publicPredictions, setPublicPredictions] = useState<
@@ -93,6 +106,11 @@ export default function MatchDetailPage({ params }: MatchDetailPageProps) {
         await getPublicPredictionsByMatch(matchId, accessToken),
       );
     } catch (loadError) {
+      if (loadError instanceof NetworkError) {
+        reportNetworkError();
+        return;
+      }
+
       if (loadError instanceof ApiError && loadError.status === 401) {
         handleExpiredSession();
         return;
@@ -104,18 +122,20 @@ export default function MatchDetailPage({ params }: MatchDetailPageProps) {
     } finally {
       setPublicPredictionsLoading(false);
     }
-  }, [accessToken, handleExpiredSession, matchId]);
+  }, [accessToken, handleExpiredSession, matchId, reportNetworkError]);
 
   useEffect(() => {
-    if (!loading && !authenticated) {
+    if (!loading && !authenticated && !hasStoredSession) {
       router.replace("/login");
     }
-  }, [authenticated, loading, router]);
+  }, [authenticated, hasStoredSession, loading, router]);
 
   useEffect(() => {
     if (loading || !authenticated || !accessToken) {
       return;
     }
+
+    const token = accessToken;
 
     async function loadMatch() {
       setPageLoading(true);
@@ -124,13 +144,19 @@ export default function MatchDetailPage({ params }: MatchDetailPageProps) {
       try {
         const [matchResponse, predictionResponse] = await Promise.all([
           getMatch(matchId),
-          getMyPredictionByMatch(matchId, accessToken),
+          getMyPredictionByMatch(matchId, token),
         ]);
 
         setMatch(matchResponse);
         setPrediction(predictionResponse);
+        reportSuccess();
         await loadPublicPredictions();
       } catch (loadError) {
+        if (loadError instanceof NetworkError) {
+          reportNetworkError();
+          return;
+        }
+
         if (loadError instanceof ApiError && loadError.status === 401) {
           handleExpiredSession();
           return;
@@ -150,6 +176,9 @@ export default function MatchDetailPage({ params }: MatchDetailPageProps) {
     loadPublicPredictions,
     loading,
     matchId,
+    reportNetworkError,
+    reportSuccess,
+    retryNonce,
   ]);
 
   async function handleSubmit(request: UpsertPredictionRequest) {
@@ -170,7 +199,18 @@ export default function MatchDetailPage({ params }: MatchDetailPageProps) {
       setPrediction(savedPrediction);
       await loadPublicPredictions();
       setMessage("Pronostico guardado.");
+      reportSuccess();
     } catch (saveError) {
+      // Guardar es una accion del usuario: no se reintenta sola, se avisa.
+      // Tampoco se cierra la sesion por un fallo de red.
+      if (saveError instanceof NetworkError) {
+        reportNetworkError();
+        setError(
+          "No fue posible guardar: el servidor no responde. Intenta de nuevo en unos segundos.",
+        );
+        return;
+      }
+
       if (saveError instanceof ApiError && saveError.status === 401) {
         handleExpiredSession();
         return;
@@ -194,24 +234,17 @@ export default function MatchDetailPage({ params }: MatchDetailPageProps) {
   }
 
   if (loading || !authenticated) {
-    return (
-      <main className="flex min-h-screen items-center justify-center px-5">
-        <p className="text-sm text-[var(--text-secondary)]">
-          Preparando tu sesión...
-        </p>
-      </main>
-    );
+    return <SessionFallback />;
   }
 
   return (
-    <main className="app-shell">
-      <AuthenticatedNav />
-      <section className="app-container max-w-4xl">
+    <AppLayout>
+      <div className="app-stack app-stack--reading">
         <Link
-          className="text-sm font-bold text-[var(--globant-dark)] underline"
+          className="btn-ghost -ml-3 px-3 py-2 text-sm"
           href="/matches"
         >
-          Volver a partidos
+          ← Volver a partidos
         </Link>
 
         {pageLoading ? (
@@ -220,13 +253,19 @@ export default function MatchDetailPage({ params }: MatchDetailPageProps) {
           </div>
         ) : null}
 
+        {offline ? (
+          <div className="mt-6">
+            <ConnectionNotice />
+          </div>
+        ) : null}
+
         {match ? (
           <>
-            <header className="brand-card my-6 p-8">
+            <header className="brand-card brand-card-accent my-6 p-8">
               <p className="eyebrow mb-2">
                 {formatDateTime(match.startsAt)}
               </p>
-              <h1 className="text-4xl font-extrabold leading-tight text-[var(--globant-dark)]">
+              <h1 className="text-3xl font-black leading-tight text-[var(--text-primary)] sm:text-4xl">
                 {teamName(match.homeTeamName, match.homeTeamCode)} vs{" "}
                 {teamName(match.awayTeamName, match.awayTeamCode)}
               </h1>
@@ -254,9 +293,10 @@ export default function MatchDetailPage({ params }: MatchDetailPageProps) {
                     <p className="eyebrow">
                       Resultado
                     </p>
-                    <p className="mt-1 text-3xl font-extrabold text-[var(--globant-dark)]">
+                    <p className="mt-1 text-3xl font-black text-[var(--text-primary)]">
                       {teamName(match.homeTeamName, match.homeTeamCode)}{" "}
-                      {match.homeScore} - {match.awayScore}{" "}
+                      <span className="text-[var(--accent-ink)]">{match.homeScore}</span> -{" "}
+                      <span className="text-[var(--accent-ink)]">{match.awayScore}</span>{" "}
                       {teamName(match.awayTeamName, match.awayTeamCode)}
                     </p>
                     {match.homePenaltyScore !== null &&
@@ -277,7 +317,7 @@ export default function MatchDetailPage({ params }: MatchDetailPageProps) {
             </section>
 
             <section className="mb-8">
-              <h2 className="mb-4 text-2xl font-extrabold text-[var(--globant-dark)]">
+              <h2 className="mb-4 text-2xl font-black text-[var(--text-primary)]">
                 Mi pronóstico
               </h2>
               {match.predictionsOpen ? (
@@ -293,12 +333,12 @@ export default function MatchDetailPage({ params }: MatchDetailPageProps) {
                     La ventana de pronósticos ya cerró.
                   </p>
                   {prediction ? (
-                    <p className="mt-3 text-3xl font-extrabold text-[var(--globant-dark)]">
+                    <p className="mt-3 text-3xl font-black text-[var(--success)]">
                       {prediction.predictedHomeScore} -{" "}
                       {prediction.predictedAwayScore}
                     </p>
                   ) : (
-                    <p className="mt-3 text-sm text-[var(--text-secondary)]">
+                    <p className="mt-3 text-sm text-[var(--text-faint)]">
                       No registraste pronóstico para este partido.
                     </p>
                   )}
@@ -308,7 +348,7 @@ export default function MatchDetailPage({ params }: MatchDetailPageProps) {
 
             <section className="mt-8 border-t border-[var(--border)] pt-6">
               <div className="mb-4">
-                <h2 className="text-2xl font-extrabold text-[var(--globant-dark)]">
+                <h2 className="text-2xl font-black text-[var(--text-primary)]">
                   Pronósticos de participantes
                 </h2>
                 {match.predictionsOpen ? (
@@ -324,7 +364,7 @@ export default function MatchDetailPage({ params }: MatchDetailPageProps) {
               ) : null}
 
               {publicPredictionsError ? (
-                <p className="rounded-[var(--radius-sm)] border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                <p className="app-alert">
                   {publicPredictionsError}
                 </p>
               ) : null}
@@ -352,17 +392,17 @@ export default function MatchDetailPage({ params }: MatchDetailPageProps) {
         ) : null}
 
         {message ? (
-          <p className="mt-5 rounded-[var(--radius-sm)] border border-[var(--globant-lime)] bg-[rgb(191_215_50_/_16%)] p-3 text-sm font-bold text-[var(--globant-dark)]">
+          <p className="mt-5 rounded-[var(--radius-sm)] border border-[var(--globant-lime)] bg-[var(--lime-soft)] p-3 text-sm font-bold text-[var(--text-primary)]">
             {message}
           </p>
         ) : null}
 
         {error ? (
-          <p className="mt-5 rounded-[var(--radius-sm)] border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <p className="app-alert mt-5">
             {error}
           </p>
         ) : null}
-      </section>
-    </main>
+      </div>
+    </AppLayout>
   );
 }

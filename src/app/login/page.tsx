@@ -6,6 +6,18 @@ import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { useAuthContext } from "@/features/auth/hooks/auth-context";
 import { BrandMark } from "@/components/ui/brand-mark";
 
+const steps = [
+  "Pronosticá cada partido antes del pitazo inicial",
+  "Sumá puntos por cada acierto del torneo",
+  "Escalá en el ranking y competí con otros Globers",
+];
+
+const tournamentStats = [
+  { value: "48", label: "Selecciones" },
+  { value: "104", label: "Partidos" },
+  { value: "3", label: "Países sede" },
+];
+
 export default function LoginPage() {
   const router = useRouter();
   const { authenticated, error, loading, loginWithGoogleCredential } =
@@ -26,62 +38,118 @@ export default function LoginPage() {
   );
 
   return (
-    <main className="app-shell flex min-h-screen items-center justify-center px-5 py-10">
-      <section className="grid w-full max-w-5xl gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="brand-card relative overflow-hidden p-8 sm:p-10">
-          <div
-            aria-hidden="true"
-            className="absolute right-8 top-8 h-24 w-24 rounded-full border border-[var(--border)]"
-          />
-          <BrandMark />
-          <div className="mt-16 max-w-xl">
-            <p className="eyebrow mb-4">Una experiencia para Globers</p>
-            <h1 className="text-4xl font-extrabold leading-tight text-[var(--globant-dark)] sm:text-5xl">
-              Viví el Mundial con Globant
-            </h1>
-            <p className="mt-5 text-lg leading-8 text-[var(--text-secondary)]">
-              Pronosticá, sumá puntos y competí con otros Globers en una polla
-              amistosa, simple y transparente.
-            </p>
-          </div>
-          <div className="mt-12 flex gap-3">
-            <span className="h-2 w-20 rounded-full bg-[var(--globant-lime)]" />
-            <span className="h-2 w-10 rounded-full bg-[var(--globant-mint)]" />
+    <main className="login-shell">
+      {/* Escena decorativa: estadio nocturno + cancha + balón */}
+      <div aria-hidden="true" className="login-scene">
+        <div className="login-scene__sky" />
+        <div className="login-scene__beams" />
+        <div className="login-scene__mesh" />
+        <div className="login-scene__pitch" />
+        <div className="login-scene__circle" />
+        <div className="login-stage">
+          <div className="login-stage__cell">
+            <div className="login-ball__aura" />
+            <div className="login-ball" />
           </div>
         </div>
+        <div className="login-scene__scrim" />
+      </div>
 
-        <div className="brand-card flex flex-col justify-center p-8 sm:p-10">
-          <p className="eyebrow mb-3">
-            Acceso institucional
-          </p>
-          <h2 className="text-3xl font-bold text-[var(--globant-dark)]">
-            Polla Mundialista 2026
-          </h2>
-          <p className="mt-4 text-base leading-7 text-[var(--text-secondary)]">
-            Iniciá sesión para registrar tus pronósticos y competir en el
-            ranking.
-          </p>
+      <div className="login-frame">
+        <header className="login-topbar">
+          <BrandMark size="lg" tone="onDark" />
+          <span className="login-chip">
+            <span aria-hidden="true" className="login-chip__dot" />
+            Canadá · México · EE. UU.
+          </span>
+        </header>
 
-        <div className="mt-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-5">
-          {loading ? (
-            <p className="text-center text-sm text-[var(--text-secondary)]">
-              Revisando sesión...
-            </p>
-          ) : (
-            <GoogleSignInButton
-              disabled={loading}
-              onCredential={handleCredential}
-            />
-          )}
+        <div className="flex flex-1 items-center">
+          <div className="login-grid">
+            {/* Zona 1 — concepto mundialista */}
+            <section className="login-grid__intro">
+              <p className="login-eyebrow">Una experiencia para Globers</p>
+
+              <h1 className="login-title">
+                Viví el <em>Mundial</em> con Globant
+              </h1>
+
+              <p className="login-lead">
+                Pronosticá, sumá puntos y competí con otros Globers en una polla
+                amistosa, simple y transparente.
+              </p>
+            </section>
+
+            {/* Zona 2 — cómo se juega */}
+            <section className="login-grid__detail">
+              <ul className="login-steps">
+                {steps.map((step, index) => (
+                  <li className="login-step" key={step}>
+                    <span aria-hidden="true" className="login-step__num">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <span className="login-step__text">{step}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="login-stats">
+                {tournamentStats.map((stat) => (
+                  <div className="login-stat" key={stat.label}>
+                    <span className="login-stat__value">{stat.value}</span>
+                    <span className="login-stat__label">{stat.label}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Zona 3 — acceso */}
+            <section className="login-grid__card login-card">
+              <p className="login-eyebrow">Acceso institucional</p>
+
+              <h2 className="login-card__title">Iniciá sesión</h2>
+
+              <p className="login-card__lead">
+                Iniciá sesión para registrar tus pronósticos y competir en el
+                ranking.
+              </p>
+
+              <div className="login-google-well">
+                {loading ? (
+                  <p className="login-muted text-center text-sm">
+                    Revisando sesión...
+                  </p>
+                ) : (
+                  <GoogleSignInButton
+                    disabled={loading}
+                    onCredential={handleCredential}
+                  />
+                )}
+              </div>
+
+              {error ? (
+                <p className="login-alert" role="alert">
+                  {error}
+                </p>
+              ) : null}
+
+              <p className="login-divider">Acceso seguro</p>
+
+              <p className="login-card__note">
+                Usamos tu cuenta de Google únicamente para identificarte dentro
+                de la polla.
+              </p>
+            </section>
+          </div>
         </div>
 
-        {error ? (
-          <p className="mt-5 rounded-[var(--radius-sm)] border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            {error}
-          </p>
-        ) : null}
-        </div>
-      </section>
+        <footer className="login-footnote">
+          <span>Polla Mundialista 2026 · by Globant</span>
+          <span className="hidden sm:inline">
+            Tu pronóstico. Tu estrategia. Tu Mundial.
+          </span>
+        </footer>
+      </div>
     </main>
   );
 }

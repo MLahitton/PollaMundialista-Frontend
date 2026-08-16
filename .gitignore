@@ -84,3 +84,8 @@ desktop.ini
 *.swp
 *.swo
 *~
+
+# Herramientas de IA
+# Lo regenera `next dev` en cada equipo; se mantiene solo en local.
+# AGENTS.md si se versiona: no contiene informacion sensible.
+CLAUDE.md

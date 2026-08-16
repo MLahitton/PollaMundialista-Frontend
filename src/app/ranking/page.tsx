@@ -2,10 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AuthenticatedNav } from "@/components/navigation/authenticated-nav";
+import { AppLayout } from "@/components/navigation/app-layout";
 import { RankingRow } from "@/components/ranking/ranking-row";
+import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingState } from "@/components/ui/loading-state";
-import { ApiError } from "@/lib/api/api-client";
+import { PageHeader } from "@/components/ui/page-header";
+import {
+  ConnectionNotice,
+  SessionFallback,
+} from "@/components/ui/connection-notice";
+import { ApiError, NetworkError } from "@/lib/api/api-client";
+import { useConnection } from "@/lib/api/connection-context";
 import { useAuthContext } from "@/features/auth/hooks/auth-context";
 import { getMyTournamentRanking } from "@/features/ranking/api/ranking-api";
 import type { TournamentRankingResponse } from "@/features/ranking/types/ranking-types";
@@ -14,7 +21,10 @@ import type { TournamentResponse } from "@/features/tournaments/types/tournament
 
 export default function RankingPage() {
   const router = useRouter();
-  const { accessToken, authenticated, loading, logout } = useAuthContext();
+  const { accessToken, authenticated, hasStoredSession, loading, logout } =
+    useAuthContext();
+  const { offline, reportNetworkError, reportSuccess, retryNonce } =
+    useConnection();
   const [tournament, setTournament] = useState<TournamentResponse | null>(null);
   const [ranking, setRanking] = useState<TournamentRankingResponse | null>(
     null,
@@ -23,15 +33,17 @@ export default function RankingPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && !authenticated) {
+    if (!loading && !authenticated && !hasStoredSession) {
       router.replace("/login");
     }
-  }, [authenticated, loading, router]);
+  }, [authenticated, hasStoredSession, loading, router]);
 
   useEffect(() => {
     if (loading || !authenticated || !accessToken) {
       return;
     }
+
+    const token = accessToken;
 
     async function loadRanking() {
       setPageLoading(true);
@@ -41,9 +53,15 @@ export default function RankingPage() {
         const activeTournament = await getActiveTournament();
         setTournament(activeTournament);
         setRanking(
-          await getMyTournamentRanking(activeTournament.id, accessToken),
+          await getMyTournamentRanking(activeTournament.id, token),
         );
+        reportSuccess();
       } catch (loadError) {
+        if (loadError instanceof NetworkError) {
+          reportNetworkError();
+          return;
+        }
+
         if (loadError instanceof ApiError && loadError.status === 401) {
           logout();
           router.replace("/login");
@@ -62,79 +80,96 @@ export default function RankingPage() {
     }
 
     void loadRanking();
-  }, [accessToken, authenticated, loading, logout, router]);
+  }, [
+    accessToken,
+    authenticated,
+    loading,
+    logout,
+    reportNetworkError,
+    reportSuccess,
+    retryNonce,
+    router,
+  ]);
 
   if (loading || !authenticated) {
-    return (
-      <main className="flex min-h-screen items-center justify-center px-5">
-        <p className="text-sm text-[var(--text-secondary)]">
-          Preparando tu sesión...
-        </p>
-      </main>
-    );
+    return <SessionFallback />;
   }
 
+  const me = ranking?.currentParticipant;
+
   return (
-    <main className="app-shell">
-      <AuthenticatedNav />
-      <section className="app-container">
-        <header className="brand-card mb-8 p-8">
-          <p className="eyebrow mb-2">
-            {tournament?.name ?? "Torneo activo"}
-          </p>
-          <h1 className="text-4xl font-extrabold text-[var(--globant-dark)]">
-            Ranking general
-          </h1>
-          <p className="mt-3 max-w-2xl text-[var(--text-secondary)]">
-            Top 10 del torneo y tu posición actual, respetando exactamente el
-            orden y los desempates del backend.
-          </p>
-          {ranking ? (
-            <p className="mt-4 text-sm font-bold text-[var(--globant-dark)]">
-              {ranking.rankedParticipants} participantes con puntuación.
-            </p>
-          ) : null}
-        </header>
+    <AppLayout>
+      <div className="app-stack">
+        <PageHeader
+          aside={
+            me ? (
+              <div className="brand-card brand-card-accent flex items-center gap-5 px-6 py-5">
+                <div className="text-center">
+                  <p className="text-[clamp(2rem,1.6rem+1vw,2.8rem)] font-black leading-none text-[var(--accent-ink)]">
+                    #{me.position}
+                  </p>
+                  <p className="mt-2 label-caps">
+                    Tu posición
+                  </p>
+                </div>
+                <span
+                  aria-hidden="true"
+                  className="h-12 w-px bg-[var(--border)]"
+                />
+                <div className="text-center">
+                  <p className="text-[clamp(2rem,1.6rem+1vw,2.8rem)] font-black leading-none text-[var(--text-primary)]">
+                    {me.totalPoints}
+                  </p>
+                  <p className="mt-2 label-caps">
+                    Puntos
+                  </p>
+                </div>
+              </div>
+            ) : null
+          }
+          description="Top 10 del torneo y tu posición actual, respetando exactamente el orden y los desempates del backend."
+          eyebrow={tournament?.name ?? "Torneo activo"}
+          title="Ranking general"
+        />
 
-        {pageLoading ? (
-          <LoadingState label="Cargando ranking..." />
-        ) : null}
+        {pageLoading ? <LoadingState label="Cargando ranking..." rows={5} /> : null}
 
-        {error ? (
-          <p className="rounded-[var(--radius-sm)] border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            {error}
-          </p>
-        ) : null}
+        {offline ? <ConnectionNotice /> : null}
+
+        {error && !offline ? <p className="app-alert">{error}</p> : null}
 
         {ranking ? (
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-10">
             <section>
-              <div className="mb-2 hidden grid-cols-[72px_1fr_90px_90px_120px] px-4 text-xs font-bold uppercase tracking-wide text-[var(--text-secondary)] sm:grid">
-                <span>Posición</span>
-                <span>Participante</span>
-                <span className="text-right">Puntos</span>
-                <span className="text-right">Exactos</span>
-                <span className="text-right">Outcomes</span>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="section-title">Top 10</h2>
+                <span className="tag tag-lime">
+                  {ranking.rankedParticipants} participantes con puntuación
+                </span>
               </div>
-              <div className="grid gap-3">
-                {ranking.top10.map((entry) => (
-                  <RankingRow entry={entry} key={entry.participantId} />
-                ))}
-              </div>
+              {ranking.top10.length === 0 ? (
+                <EmptyState
+                  description="En cuanto se puntúe el primer partido vas a ver acá la tabla del torneo."
+                  title="El ranking todavía no tiene participantes"
+                />
+              ) : (
+                <div className="grid gap-3">
+                  {ranking.top10.map((entry) => (
+                    <RankingRow entry={entry} key={entry.participantId} />
+                  ))}
+                </div>
+              )}
             </section>
 
-            <section className="border-t border-[var(--border)] pt-5">
-              <h2 className="mb-3 text-sm font-extrabold uppercase tracking-wide text-[var(--globant-dark)]">
-                Tu posición
-              </h2>
-              <RankingRow
-                entry={ranking.currentParticipant}
-                label="Tu ranking"
-              />
-            </section>
+            {me ? (
+              <section>
+                <h2 className="section-title mb-4">Tu posición</h2>
+                <RankingRow entry={me} label="Tu ranking" />
+              </section>
+            ) : null}
           </div>
         ) : null}
-      </section>
-    </main>
+      </div>
+    </AppLayout>
   );
 }

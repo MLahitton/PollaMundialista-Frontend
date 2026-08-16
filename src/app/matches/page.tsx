@@ -2,11 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AuthenticatedNav } from "@/components/navigation/authenticated-nav";
+import { AppLayout } from "@/components/navigation/app-layout";
 import { MatchCard } from "@/components/matches/match-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { LoadingState } from "@/components/ui/loading-state";
-import { ApiError } from "@/lib/api/api-client";
+import {
+  ConnectionNotice,
+  SessionFallback,
+} from "@/components/ui/connection-notice";
+import { ApiError, NetworkError } from "@/lib/api/api-client";
+import { useConnection } from "@/lib/api/connection-context";
 import { useAuthContext } from "@/features/auth/hooks/auth-context";
 import { getUpcomingMatches } from "@/features/matches/api/matches-api";
 import type { MatchResponse } from "@/features/matches/types/match-types";
@@ -27,7 +33,10 @@ function dateKey(value: string): string {
 
 export default function MatchesPage() {
   const router = useRouter();
-  const { accessToken, authenticated, loading, logout } = useAuthContext();
+  const { accessToken, authenticated, hasStoredSession, loading, logout } =
+    useAuthContext();
+  const { offline, reportNetworkError, reportSuccess, retryNonce } =
+    useConnection();
   const [tournament, setTournament] = useState<TournamentResponse | null>(null);
   const [matches, setMatches] = useState<MatchResponse[]>([]);
   const [predictions, setPredictions] = useState<PredictionResponse[]>([]);
@@ -35,15 +44,19 @@ export default function MatchesPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && !authenticated) {
+    // Solo salir a /login si realmente no hay sesion: si el backend esta
+    // caido conservamos el token y esperamos a que vuelva.
+    if (!loading && !authenticated && !hasStoredSession) {
       router.replace("/login");
     }
-  }, [authenticated, loading, router]);
+  }, [authenticated, hasStoredSession, loading, router]);
 
   useEffect(() => {
     if (loading || !authenticated || !accessToken) {
       return;
     }
+
+    const token = accessToken;
 
     async function loadMatches() {
       setPageLoading(true);
@@ -55,12 +68,20 @@ export default function MatchesPage() {
 
         const [upcomingMatches, myPredictions] = await Promise.all([
           getUpcomingMatches(activeTournament.id),
-          getMyPredictions(activeTournament.id, accessToken),
+          getMyPredictions(activeTournament.id, token),
         ]);
 
         setMatches(upcomingMatches);
         setPredictions(myPredictions);
+        reportSuccess();
       } catch (loadError) {
+        // Backend caido: conservar los datos ya mostrados y dejar que el
+        // proveedor de conexion reintente. No es un error de la pagina.
+        if (loadError instanceof NetworkError) {
+          reportNetworkError();
+          return;
+        }
+
         if (loadError instanceof ApiError && loadError.status === 401) {
           logout();
           router.replace("/login");
@@ -74,7 +95,16 @@ export default function MatchesPage() {
     }
 
     void loadMatches();
-  }, [accessToken, authenticated, loading, logout, router]);
+  }, [
+    accessToken,
+    authenticated,
+    loading,
+    logout,
+    reportNetworkError,
+    reportSuccess,
+    retryNonce,
+    router,
+  ]);
 
   const predictionsByMatchId = useMemo(() => {
     return new Map(predictions.map((prediction) => [prediction.matchId, prediction]));
@@ -90,53 +120,75 @@ export default function MatchesPage() {
   }, [matches]);
 
   if (loading || !authenticated) {
-    return (
-      <main className="flex min-h-screen items-center justify-center px-5">
-        <p className="text-sm text-[var(--text-secondary)]">
-          Preparando tu sesión...
-        </p>
-      </main>
-    );
+    return <SessionFallback />;
   }
 
+  const pendingCount = matches.filter(
+    (match) => match.predictionsOpen && !predictionsByMatchId.has(match.id),
+  ).length;
+
   return (
-    <main className="app-shell">
-      <AuthenticatedNav />
-      <section className="app-container">
-        <header className="mb-8">
-          <p className="eyebrow mb-2">
-            {tournament?.name ?? "Torneo activo"}
-          </p>
-          <h1 className="text-4xl font-extrabold text-[var(--globant-dark)]">
-            Partidos
-          </h1>
-          <p className="mt-3 max-w-2xl text-[var(--text-secondary)]">
-            El fixture es el centro de la experiencia: revisá horarios,
-            estados y tus pronósticos guardados.
-          </p>
-        </header>
+    <AppLayout>
+      <div className="app-stack">
+        <PageHeader
+          aside={
+            !pageLoading && matches.length > 0 ? (
+              <div className="flex gap-3">
+                <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] px-5 py-4 text-center">
+                  <p className="text-2xl font-black leading-none text-[var(--text-primary)]">
+                    {matches.length}
+                  </p>
+                  <p className="mt-2 label-caps">
+                    Próximos
+                  </p>
+                </div>
+                <div className="rounded-[var(--radius-md)] border border-[rgba(191,215,50,0.35)] bg-[rgba(191,215,50,0.12)] px-5 py-4 text-center">
+                  <p className="text-2xl font-black leading-none text-[var(--accent-ink)]">
+                    {pendingCount}
+                  </p>
+                  <p className="mt-2 label-caps">
+                    Sin pronóstico
+                  </p>
+                </div>
+              </div>
+            ) : null
+          }
+          description="El fixture es el centro de la experiencia: revisá horarios, estados y tus pronósticos guardados."
+          eyebrow={tournament?.name ?? "Torneo activo"}
+          title="Partidos"
+        />
 
-        {pageLoading ? (
-          <LoadingState label="Cargando partidos..." />
+        {pageLoading ? <LoadingState label="Cargando partidos..." /> : null}
+
+        {offline ? <ConnectionNotice /> : null}
+
+        {error && !offline ? <p className="app-alert">{error}</p> : null}
+
+        {/* El estado vacio solo aplica si el backend respondio 200 con []. */}
+        {!pageLoading && !error && !offline && matches.length === 0 ? (
+          <EmptyState
+            description="Cuando el calendario del torneo esté publicado vas a poder cargar tus pronósticos desde acá."
+            title="No hay partidos próximos"
+          />
         ) : null}
 
-        {error ? (
-          <p className="rounded-[var(--radius-sm)] border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            {error}
-          </p>
-        ) : null}
-
-        {!pageLoading && !error && matches.length === 0 ? (
-          <EmptyState title="No hay partidos próximos." />
-        ) : null}
-
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-10">
           {Array.from(matchesByDate.entries()).map(([date, dateMatches]) => (
             <section key={date}>
-              <h2 className="mb-3 text-sm font-extrabold uppercase tracking-wide text-[var(--globant-dark)]">
-                {date}
-              </h2>
-              <div className="grid gap-3">
+              <div className="mb-4 flex items-center gap-4">
+                <h2 className="text-sm font-black uppercase tracking-[0.14em] text-[var(--accent-ink)]">
+                  {date}
+                </h2>
+                <span
+                  aria-hidden="true"
+                  className="h-px flex-1 bg-[linear-gradient(90deg,rgba(191,215,50,0.55)_0%,var(--border)_100%)]"
+                />
+                <span className="text-xs font-bold text-[var(--text-faint)]">
+                  {dateMatches.length}{" "}
+                  {dateMatches.length === 1 ? "partido" : "partidos"}
+                </span>
+              </div>
+              <div className="grid gap-4 xl:grid-cols-2">
                 {dateMatches.map((match) => (
                   <MatchCard
                     key={match.id}
@@ -148,7 +200,7 @@ export default function MatchesPage() {
             </section>
           ))}
         </div>
-      </section>
-    </main>
+      </div>
+    </AppLayout>
   );
 }

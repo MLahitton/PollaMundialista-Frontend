@@ -11,6 +11,27 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * El backend no respondio: esta apagado, reiniciandose, o la red fallo.
+ *
+ * Es deliberadamente distinto de ApiError: un ApiError significa que el
+ * backend SI respondio (401, 404, 500...). Confundir ambos es lo que hacia
+ * que un reinicio del backend se interpretara como "sesion expirada".
+ */
+export class NetworkError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "NetworkError";
+  }
+}
+
+export function isNetworkError(error: unknown): error is NetworkError {
+  return error instanceof NetworkError;
+}
+
+/** Corta peticiones colgadas para que un backend "a medio arrancar" no bloquee la UI. */
+const REQUEST_TIMEOUT_MS = 15_000;
+
 type ApiRequestOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
@@ -48,11 +69,24 @@ export async function apiClient<T>(
     headers.set("Authorization", `Bearer ${options.accessToken}`);
   }
 
-  const response = await fetch(`${env.apiBaseUrl}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${env.apiBaseUrl}${path}`, {
+      method: options.method ?? "GET",
+      headers,
+      body:
+        options.body === undefined ? undefined : JSON.stringify(options.body),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (cause) {
+    // fetch solo rechaza cuando no hubo respuesta HTTP: conexion rechazada,
+    // DNS, CORS a un puerto muerto, o el timeout de arriba.
+    throw new NetworkError(
+      "No fue posible conectar con el servidor.",
+      { cause },
+    );
+  }
 
   if (!response.ok) {
     throw new ApiError(response.status, await parseErrorMessage(response));

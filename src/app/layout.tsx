@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Heebo } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/features/auth/hooks/auth-context";
+import { ConnectionProvider } from "@/lib/api/connection-context";
 
 const heebo = Heebo({
   subsets: ["latin"],
@@ -22,7 +23,11 @@ export default function RootLayout({
   return (
     <html className={heebo.variable} lang="es">
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        {/* ConnectionProvider envuelve a AuthProvider: la sesion necesita
+            saber si un fallo fue de red antes de decidir que hacer. */}
+        <ConnectionProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ConnectionProvider>
       </body>
     </html>
   );
