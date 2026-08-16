@@ -8,6 +8,10 @@ Este repositorio contiene **únicamente el frontend**: la interfaz web donde el 
 
 El frontend no calcula nada por su cuenta: muestra la información que entrega el backend. Por eso necesita que el backend esté encendido para funcionar.
 
+> **Repositorio del backend:** https://github.com/MLahitton/PollaMundialista-Backend
+>
+> La API del proyecto está en ese repositorio, con su propia guía de instalación.
+
 ---
 
 ## 2. Objetivo
@@ -131,6 +135,9 @@ NEXT_PUBLIC_GOOGLE_CLIENT_ID=TU_CLIENT_ID.apps.googleusercontent.com
 ### Paso 5 — Encender el backend
 
 Este frontend **no funciona solo**. Antes de continuar, el backend debe estar corriendo en la dirección que pusiste en `NEXT_PUBLIC_API_BASE_URL` (por defecto `http://localhost:8080`).
+
+Si todavía no lo tienes instalado, sigue la guía de su repositorio:
+https://github.com/MLahitton/PollaMundialista-Backend
 
 Si el backend está apagado podrás abrir la web, pero verás un aviso de conexión y no cargará ningún dato.
 
