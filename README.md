@@ -202,3 +202,15 @@ Si las páginas cargan sin errores, la instalación está lista.
 | El puerto 3000 está ocupado | Cierra el otro programa que lo use; conviene mantener el 3000 por el login de Google |
 
 > Después de cambiar `.env.local`, detén el servidor con `Ctrl + C` y vuelve a ejecutar `pnpm dev`.
+
+## 20. Autores
+
+Proyecto desarrollado por:
+
+- **Manuel José Gómez Laiton** 
+- **Valentina Mancilla** 
+- **Tomas Esteban González Quintero**
+- **Sara Brigete Carlier Méndez**
+- **luis**
+
+Polla Mundialista 2026, proyecto universitario desarrollado en el marco de Globant.
