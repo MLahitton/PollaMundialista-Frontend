@@ -1,523 +1,204 @@
-Polla Mundialista 2026 — Frontend
+# Polla Mundialista — Frontend
 
-Guía de instalación, configuración y ejecución local desde un computador limpio.
+## 1. Descripción del Proyecto
 
-Proyecto: Frontend de la Polla Mundialista 2026Stack principal: Next.js 16, React, TypeScript, Tailwind CSS, pnpm, Google Identity ServicesBackend esperado: http://localhost:8080Frontend local: http://localhost:3000Contenedores: este proyecto no usa Docker.
+Polla Mundialista es una aplicación para competir pronosticando los partidos del **Mundial 2026**: cada persona predice los marcadores, suma puntos según sus aciertos y compite con el resto en un ranking.
 
-1. Qué necesitas instalar
+Este repositorio contiene **únicamente el frontend**: la interfaz web donde el usuario inicia sesión con Google, revisa los partidos del torneo activo, guarda sus pronósticos antes del cierre, consulta sus puntos y mira el ranking.
 
-1.1 Git
+El frontend no calcula nada por su cuenta: muestra la información que entrega el backend. Por eso necesita que el backend esté encendido para funcionar.
 
-Descarga Git para Windows:
+---
 
-https://git-scm.com/install/windows
+## 2. Objetivo
 
-Verifica:
+Ofrecer una interfaz web simple para que cualquier participante pueda iniciar sesión, pronosticar los partidos del Mundial 2026 y seguir sus puntos y su posición en el ranking.
 
-git --version
+---
 
-1.2 Node.js 24 LTS
+## 3. Características Destacadas
 
-El frontend se desarrolló sobre Node.js 24.
+- Inicio de sesión con Google (Google Identity Services).
+- Sesión guardada en el navegador para no tener que entrar en cada recarga.
+- Lista de próximos partidos del torneo activo, con estado de cada uno (abierto, cerrado, en juego, finalizado, puntuado).
+- Detalle de partido para crear o editar el pronóstico mientras esté abierto.
+- Vista de los pronósticos de los demás participantes una vez cerrado el partido.
+- Página "Mis pronósticos" con todo lo que guardaste en el torneo activo.
+- Página "Mis puntos" con el detalle de cada partido ya puntuado.
+- Ranking con el Top 10 y tu posición actual.
+- Contador de partidos pendientes de pronosticar en el menú lateral.
+- Aviso automático en pantalla cuando el backend no responde.
+- Diseño responsive (escritorio y móvil).
 
-Descarga la versión LTS desde:
+---
 
-https://nodejs.org/en/download
+## 4. Tecnologías Utilizadas
 
-En Windows usa el instalador x64 recomendado.
+| Tecnología | Uso |
+|---|---|
+| Next.js 16 | Framework del frontend (App Router) |
+| React 19 | Interfaz y componentes |
+| TypeScript | Lenguaje de desarrollo |
+| Tailwind CSS 4 | Estilos |
+| Google Identity Services | Inicio de sesión con Google |
+| ESLint | Revisión de código |
+| pnpm | Gestor de dependencias |
 
-Después de instalar, cierra y vuelve a abrir PowerShell.
+---
 
-Verifica:
+## 5. Instalación y Configuración
 
-node --version
-npm --version
+### Paso 1 — Instalar lo necesario
 
-Se recomienda Node.js 24 LTS.
+Necesitas tres programas:
 
-1.3 pnpm
+- **Git** — para descargar el proyecto.
+- **Node.js 24 o superior** — para poder ejecutar el frontend.
+- **pnpm 11** — para instalar las dependencias del proyecto.
 
-El proyecto usa pnpm, no npm ni yarn, para instalar dependencias.
+Descargas oficiales:
 
-Una vez instalado Node.js:
+- Git: https://git-scm.com/downloads
+- Node.js (versión LTS): https://nodejs.org/en/download
 
+Con Node.js ya instalado, instala pnpm:
+
+```bash
 npm install -g pnpm
+```
 
-Verifica:
+Cierra y vuelve a abrir la terminal, y comprueba que todo quedó bien:
 
-pnpm --version
+```bash
+git --version
+node -v
+pnpm -v
+```
 
-El repositorio incluye pnpm-lock.yaml. Debe conservarse y utilizarse para instalar las versiones resueltas del proyecto.
+Debes ver una versión de Node **24 o superior** y una versión de pnpm **11 o superior**.
 
-1.4 Visual Studio Code — recomendado
+---
 
-Descarga:
+### Paso 2 — Descargar el proyecto
 
-https://code.visualstudio.com/docs/setup/windows
+```bash
+git clone https://github.com/MLahitton/PollaMundialista-Frontend.git
+cd PollaMundialista-Frontend
+```
 
-Extensiones recomendadas para frontend:
+---
 
-ESLint
+### Paso 3 — Instalar las dependencias
 
-Tailwind CSS IntelliSense
-
-Opcionales:
-
-GitLens
-
-Error Lens
-
-No necesitas extensiones Java para trabajar únicamente en frontend.
-
-2. Clonar el repositorio
-
-git clone https://github.com/MLahitton/polla-mundialista-2026-frontend.git
-cd polla-mundialista-2026-frontend
-
-Comprueba:
-
-git status
-git branch --show-current
-
-Antes de empezar a trabajar:
-
-git pull
-
-3. Instalar dependencias
-
-Desde la raíz del frontend:
-
+```bash
 pnpm install
+```
 
-El proyecto instalará las dependencias definidas en package.json y pnpm-lock.yaml.
+Si aparece el error `ERR_PNPM_IGNORED_BUILDS`, ejecuta `pnpm approve-builds`, aprueba `unrs-resolver` y vuelve a ejecutar `pnpm install`.
 
-Si aparece ERR_PNPM_IGNORED_BUILDS
+---
 
-En algunos equipos pnpm puede bloquear inicialmente el build script de unrs-resolver.
+### Paso 4 — Configurar las variables de entorno
 
-Si ocurre:
+El proyecto ya trae el archivo `.env.example` con las variables que necesita. **No las crees desde cero: copia ese archivo.**
 
-pnpm approve-builds
+En PowerShell (Windows):
 
-Selecciona:
+```powershell
+Copy-Item .env.example .env.local
+```
 
-unrs-resolver
+En Git Bash / macOS / Linux:
 
-Confirma y vuelve a ejecutar:
+```bash
+cp .env.example .env.local
+```
 
-pnpm install
+Abre el archivo `.env.local` que acabas de crear y complétalo:
 
-No apruebes paquetes desconocidos sin revisarlos.
-
-4. Configurar .env.local
-
-El archivo .env.local no se sube a GitHub.
-
-En la raíz del frontend crea:
-
-.env.local
-
-Contenido:
-
+```env
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
-NEXT_PUBLIC_GOOGLE_CLIENT_ID=TU_GOOGLE_CLIENT_ID.apps.googleusercontent.com
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=TU_CLIENT_ID.apps.googleusercontent.com
+```
 
-NEXT_PUBLIC_API_BASE_URL
+- `NEXT_PUBLIC_API_BASE_URL`: dirección del backend. Para trabajar en tu computador se deja tal cual viene: `http://localhost:8080`.
+- `NEXT_PUBLIC_GOOGLE_CLIENT_ID`: viene vacío. **Pídeselo al responsable del proyecto.** Debe ser el mismo Client ID de Google que usa el backend, o el login fallará.
 
-Para desarrollo local debe apuntar al backend:
+`.env.local` no se sube a GitHub (está en `.gitignore`). Nunca pongas contraseñas ni secretos en este archivo: el frontend solo usa estas dos variables.
 
-http://localhost:8080
+---
 
-NEXT_PUBLIC_GOOGLE_CLIENT_ID
+### Paso 5 — Encender el backend
 
-Solicita al responsable del proyecto el Web Client ID de Google configurado para la Polla Mundialista.
+Este frontend **no funciona solo**. Antes de continuar, el backend debe estar corriendo en la dirección que pusiste en `NEXT_PUBLIC_API_BASE_URL` (por defecto `http://localhost:8080`).
 
-Debe ser exactamente el mismo Client ID usado en el backend como:
+Si el backend está apagado podrás abrir la web, pero verás un aviso de conexión y no cargará ningún dato.
 
-GOOGLE_CLIENT_ID
+---
 
-El Google Client ID no es secreto, pero se mantiene en .env.local para separar configuración de cada entorno. Nunca pongas JWT_SECRET, DB passwords o Google Client Secret en el frontend.
+### Paso 6 — Ejecutar el proyecto
 
-5. Google Auth y localhost
-
-El proyecto utiliza Google Identity Services.
-
-Para desarrollo local, el OAuth Web Client debe permitir el origen:
-
-http://localhost:3000
-
-Si ejecutas el frontend en otro puerto, Google puede rechazar el login hasta que ese origen sea autorizado en Google Cloud.
-
-El frontend no almacena el Google ID Token. El flujo es:
-
-Google Identity Services
-→ Google ID Token temporal
-→ POST /api/v1/auth/google
-→ backend devuelve JWT propio
-→ frontend guarda únicamente el JWT propio
-
-6. El backend debe estar funcionando
-
-Antes de probar login, partidos, pronósticos, ranking o scores, el backend debe estar disponible en:
-
-http://localhost:8080
-
-Puedes comprobarlo con:
-
-http://localhost:8080/actuator/health
-
-Si el backend no está iniciado, el frontend puede arrancar pero las funcionalidades con datos fallarán.
-
-7. Arrancar frontend
-
+```bash
 pnpm dev
+```
 
-Resultado esperado:
+La aplicación queda disponible en:
 
-Next.js
-Local: http://localhost:3000
-Ready
-
-Abre:
-
+```
 http://localhost:3000
+```
 
-8. Primera prueba de Google Login
+Mantén el puerto **3000**: el inicio de sesión con Google está autorizado para `http://localhost:3000`. Si usas otro puerto, Google puede rechazar el login.
 
-Abre http://localhost:3000.
+Para detenerlo, presiona `Ctrl + C` en la terminal.
 
-Ve a login si la aplicación redirige automáticamente.
+---
 
-Pulsa el botón oficial Iniciar sesión con Google.
+### Paso 7 — Iniciar sesión
 
-Usa una cuenta Google válida.
+1. Abre http://localhost:3000 en el navegador.
+2. La aplicación te llevará a la pantalla de inicio de sesión.
+3. Pulsa el botón **Iniciar sesión con Google** y elige tu cuenta.
+4. Si el inicio de sesión fue correcto, entrarás a la pantalla principal con tu nombre y tu foto.
 
-Si es el primer ingreso de esa cuenta, el backend crea automáticamente un Participant.
+---
 
-Si la cuenta ya había ingresado, reutiliza el mismo participante.
+### Paso 8 — Verificar que funciona
 
-Después del login la home debe mostrar al usuario autenticado.
+Con la sesión abierta, entra a estas páginas y confirma que cargan datos:
 
-El JWT propio del backend se guarda en localStorage con la lógica interna de auth del proyecto.
+| Página | Dirección | Qué debe mostrar |
+|---|---|---|
+| Inicio | http://localhost:3000 | Tu nombre y los accesos principales |
+| Partidos | http://localhost:3000/matches | Los próximos partidos del torneo |
+| Mis pronósticos | http://localhost:3000/predictions | Tus pronósticos guardados |
+| Ranking | http://localhost:3000/ranking | El Top 10 y tu posición |
+| Mis puntos | http://localhost:3000/scores | Tus partidos ya puntuados |
 
-No copies ni compartas ese token.
+Si las páginas cargan sin errores, la instalación está lista.
 
-9. Páginas principales para probar
+---
 
-Home
+## 6. Comandos disponibles
 
-http://localhost:3000
+| Comando | Qué hace |
+|---|---|
+| `pnpm dev` | Ejecuta el proyecto en modo desarrollo (puerto 3000) |
+| `pnpm build` | Genera la versión de producción |
+| `pnpm start` | Ejecuta la versión de producción (puerto 3000) |
+| `pnpm lint` | Revisa el código con ESLint |
 
-Debe mostrar sesión autenticada y accesos funcionales.
+---
 
-Partidos
+## 7. Problemas frecuentes
 
-http://localhost:3000/matches
+| Problema | Solución |
+|---|---|
+| `pnpm` no se reconoce | Ejecuta `npm install -g pnpm` y reinicia la terminal |
+| `ERR_PNPM_IGNORED_BUILDS` al instalar | `pnpm approve-builds`, aprueba `unrs-resolver` y repite `pnpm install` |
+| El botón de Google no aparece | Falta `NEXT_PUBLIC_GOOGLE_CLIENT_ID` en `.env.local`, o no reiniciaste `pnpm dev` después de editarlo |
+| El login con Google falla | El Client ID no es el mismo que usa el backend, o no estás en `http://localhost:3000` |
+| Aviso de "sin conexión" o páginas vacías | El backend no está encendido en `http://localhost:8080` |
+| El puerto 3000 está ocupado | Cierra el otro programa que lo use; conviene mantener el 3000 por el login de Google |
 
-Debe mostrar los próximos partidos del torneo activo.
-
-Mis pronósticos
-
-http://localhost:3000/predictions
-
-Ranking
-
-http://localhost:3000/ranking
-
-Mis puntos
-
-http://localhost:3000/scores
-
-10. Cómo probar pronósticos con el reloj histórico
-
-El frontend no controla el reloj directamente. Para pruebas históricas, un desarrollador mueve ApplicationClock desde Swagger del backend.
-
-Ejemplo:
-
-POST /api/v1/internal/clock/historical
-
-Body:
-
-{
-  "instant": "2026-06-11T18:44:00Z"
-}
-
-Después refresca el frontend.
-
-El frontend debe reflejar lo que backend responda:
-
-OPEN_FOR_PREDICTIONS
-
-PREDICTION_CLOSED
-
-IN_PROGRESS
-
-FINISHED
-
-SCORED
-
-No modifiques la hora del computador para probar estas reglas.
-
-11. Flujo funcional recomendado para pruebas
-
-Con backend y frontend levantados:
-
-Mueve el reloj histórico antes del cierre de un partido.
-
-Inicia sesión con Usuario A.
-
-Crea un pronóstico.
-
-Inicia sesión con Usuario B en otro perfil/incógnito.
-
-Crea otro pronóstico.
-
-Antes del cierre, cada usuario debe ver solo su propio pronóstico.
-
-Mueve el reloj exactamente al cierre.
-
-Refresca: ya no debe poder editarse.
-
-Los pronósticos de los demás deben hacerse visibles.
-
-Avanza el reloj al resultado.
-
-Ejecuta scoring en backend.
-
-Revisa /scores.
-
-Revisa /ranking.
-
-12. Resultado y scoring
-
-El frontend no calcula puntos. Solo muestra los valores devueltos por backend.
-
-Reglas actuales mostradas por la interfaz:
-
-Marcador exacto: 5 puntos.
-
-Resultado/outcome correcto: 3 puntos.
-
-Fallo: 0 puntos.
-
-Bonus por clasificado en penales cuando corresponda: +1.
-
-No implementes reglas de scoring nuevas en frontend.
-
-13. Ranking
-
-La pantalla:
-
-/ranking
-
-muestra:
-
-Top 10 general.
-
-La posición del participante autenticado en una sección separada.
-
-El frontend usa la posición que entrega backend; no recalcula ranking ni desempates.
-
-14. Desarrollo diario
-
-Al comenzar:
-
-git pull
-pnpm install
-pnpm dev
-
-pnpm install normalmente será rápido si no cambió el lockfile.
-
-No uses npm install dentro del proyecto salvo que el equipo decida explícitamente migrar de gestor de paquetes.
-
-15. Comandos de verificación
-
-git --version
-node --version
-npm --version
-pnpm --version
-
-Opcional antes de subir cambios:
-
-pnpm lint
-pnpm build
-
-Si el equipo todavía está trabajando activamente y una de estas validaciones falla, corrige antes de abrir PR o avisar claramente al resto del equipo.
-
-16. Problemas comunes
-
-pnpm no existe
-
-npm install -g pnpm
-
-Cierra y vuelve a abrir PowerShell.
-
-ERR_PNPM_IGNORED_BUILDS
-
-pnpm approve-builds
-
-Aprueba unrs-resolver si es el paquete esperado y luego:
-
-pnpm install
-
-Puerto 3000 ocupado
-
-netstat -ano | findstr :3000
-
-Detén el proceso que usa el puerto.
-
-Se recomienda conservar el puerto 3000 porque Google OAuth está configurado para http://localhost:3000.
-
-Login Google no funciona
-
-Comprueba:
-
-.env.local existe;
-
-NEXT_PUBLIC_GOOGLE_CLIENT_ID es correcto;
-
-backend usa el mismo GOOGLE_CLIENT_ID;
-
-backend está encendido;
-
-frontend corre en http://localhost:3000;
-
-el origen está autorizado en Google Cloud.
-
-401 Unauthorized
-
-La sesión puede haber expirado o el JWT no es válido.
-
-Cierra sesión e inicia nuevamente con Google.
-
-Error CORS
-
-Backend debe permitir:
-
-http://localhost:3000
-
-Si cambiaste el puerto/origen del frontend, ajusta CORS_ALLOWED_ORIGINS en backend.
-
-Backend no responde
-
-Comprueba:
-
-http://localhost:8080/actuator/health
-
-Si no abre, revisa primero el backend.
-
-Lista de partidos vacía en una instalación nueva
-
-Probablemente no se haya ejecutado el importador del dataset.
-
-En Swagger backend ejecuta:
-
-POST /api/v1/internal/dataset/world-cup-2026/import
-
-17. Archivos que nunca deben subirse
-
-No publiques:
-
-.env.local;
-
-JWTs;
-
-Google ID Tokens;
-
-JWT_SECRET;
-
-passwords PostgreSQL;
-
-Google Client Secrets;
-
-datos personales exportados de la base;
-
-node_modules;
-
-.next.
-
-Sí debe subirse:
-
-.env.example;
-
-package.json;
-
-pnpm-lock.yaml;
-
-src/;
-
-public/;
-
-configuración de Next/TypeScript/Tailwind/ESLint.
-
-18. Trabajo en equipo con Git
-
-Antes de comenzar una tarea:
-
-git checkout main
-git pull
-
-Crea una rama para tu trabajo:
-
-git switch -c feature/nombre-corto
-
-Revisa cambios:
-
-git status
-git diff
-
-Antes de subir, evita incluir:
-
-.env.local;
-
-archivos generados;
-
-cambios no relacionados con tu tarea.
-
-El equipo debe acordar si los cambios entran por Pull Request antes de fusionarlos a main.
-
-19. Checklist de instalación completa
-
-Git instalado.
-
-Node.js 24 LTS instalado.
-
-npm operativo.
-
-pnpm instalado.
-
-Repositorio clonado.
-
-pnpm install completado.
-
-.env.local creado.
-
-NEXT_PUBLIC_API_BASE_URL configurado.
-
-NEXT_PUBLIC_GOOGLE_CLIENT_ID configurado.
-
-Backend arrancado en 8080.
-
-pnpm dev inicia en 3000.
-
-Login Google funciona.
-
-Home autenticada funciona.
-
-/matches carga partidos.
-
-/predictions carga pronósticos.
-
-/scores carga puntos.
-
-/ranking carga ranking.
-
-Fuentes oficiales de instalación
-
-Node.js: https://nodejs.org/en/download
-
-pnpm: https://pnpm.io/
-
-Git para Windows: https://git-scm.com/install/windows
-
-Visual Studio Code: https://code.visualstudio.com/docs/setup/windows
+> Después de cambiar `.env.local`, detén el servidor con `Ctrl + C` y vuelve a ejecutar `pnpm dev`.
