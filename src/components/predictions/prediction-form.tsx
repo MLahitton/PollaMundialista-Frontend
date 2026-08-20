@@ -105,11 +105,16 @@ export function PredictionForm({
         </label>
       </div>
 
+      {/* Solo en eliminacion directa: el backend rechaza con 400 cualquier
+          predictedQualifiedTeamId en partidos de fase de grupos. */}
       {isKnockout ? (
-        <fieldset className="mt-6 rounded-[var(--radius-md)] border border-[var(--border)] p-4 bg-[rgba(0,0,0,0.2)]">
+        <fieldset className="mt-6 rounded-[var(--radius-md)] border border-[var(--border)] p-4">
           <legend className="px-2 text-xs font-extrabold uppercase tracking-wider text-[var(--accent-ink)]">
             ¿Quién clasifica?
           </legend>
+          <p className="text-sm leading-5 text-[var(--text-secondary)]">
+            Suma 1 punto extra si el partido se define por penales.
+          </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {[match.homeTeamId, match.awayTeamId].map((teamId, index) => {
               const label =
@@ -117,30 +122,38 @@ export function PredictionForm({
                   ? teamName(match.homeTeamName, match.homeTeamCode)
                   : teamName(match.awayTeamName, match.awayTeamCode);
               const selected = teamId !== null && qualifiedTeamId === teamId;
+              // Un cruce todavia sin rival definido no se puede pronosticar.
+              const disabled = teamId === null;
 
               return (
                 <label
-                  className={`flex cursor-pointer items-center gap-3 rounded-[var(--radius-md)] border px-4 py-3 text-sm font-bold transition-all ${
-                    selected
-                      ? "border-[var(--globant-lime)] bg-[var(--lime-soft)] text-[var(--text-primary)] shadow-[0_0_12px_rgba(191,215,50,0.2)]"
-                      : "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-secondary)] hover:border-[rgba(255,255,255,0.2)]"
+                  className={`flex items-center gap-3 rounded-[var(--radius-md)] border px-4 py-3 text-sm font-bold transition-all ${
+                    disabled
+                      ? "cursor-not-allowed border-[var(--border)] bg-[var(--surface)] text-[var(--text-faint)]"
+                      : selected
+                        ? "cursor-pointer border-[var(--globant-lime)] bg-[var(--lime-soft)] text-[var(--text-primary)] shadow-[0_0_0_3px_rgba(191,215,50,0.25)]"
+                        : "cursor-pointer border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text-primary)] hover:border-[var(--globant-lime)] hover:bg-[var(--surface-hover)]"
                   }`}
                   key={`${teamId ?? index}`}
                 >
                   <input
                     checked={selected}
-                    disabled={teamId === null}
+                    className="h-4 w-4 shrink-0 accent-[var(--globant-lime)]"
+                    disabled={disabled}
                     name="qualifiedTeamId"
                     onChange={() => setQualifiedTeamId(teamId)}
                     type="radio"
                   />
-                  {label}
+                  <span className="truncate">{label}</span>
                 </label>
               );
             })}
           </div>
+          {/* text-xs! lleva !important a proposito: la regla `button { font: inherit }`
+              de globals.css no esta en una capa y por eso gana a las utilidades de
+              Tailwind. Sin el, el chip renderiza a 16px igual que el CTA principal. */}
           <button
-            className="mt-3 text-xs font-bold text-[var(--text-faint)] hover:text-[var(--text-primary)] underline"
+            className="btn-secondary mt-3 px-3 py-1.5 text-xs!"
             onClick={() => setQualifiedTeamId(null)}
             type="button"
           >

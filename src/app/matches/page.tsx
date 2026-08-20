@@ -18,6 +18,12 @@ import { getUpcomingMatches } from "@/features/matches/api/matches-api";
 import type { MatchResponse } from "@/features/matches/types/match-types";
 import { getMyPredictions } from "@/features/predictions/api/predictions-api";
 import type { PredictionResponse } from "@/features/predictions/types/prediction-types";
+import { StageHeader } from "@/components/matches/stage-header";
+import { getStagesByTournament } from "@/features/stages/api/stages-api";
+import type {
+  StageResponse,
+  StageTypeValue,
+} from "@/features/stages/types/stage-types";
 import { getActiveTournament } from "@/features/tournaments/api/tournaments-api";
 import type { TournamentResponse } from "@/features/tournaments/types/tournament-types";
 
@@ -31,6 +37,15 @@ function dateKey(value: string): string {
     .toUpperCase();
 }
 
+function groupByDate(stageMatches: MatchResponse[]): Map<string, MatchResponse[]> {
+  return stageMatches.reduce<Map<string, MatchResponse[]>>((groups, match) => {
+    const key = dateKey(match.startsAt);
+    const current = groups.get(key) ?? [];
+    groups.set(key, [...current, match]);
+    return groups;
+  }, new Map());
+}
+
 export default function MatchesPage() {
   const router = useRouter();
   const { accessToken, authenticated, hasStoredSession, loading, logout } =
@@ -39,6 +54,7 @@ export default function MatchesPage() {
     useConnection();
   const [tournament, setTournament] = useState<TournamentResponse | null>(null);
   const [matches, setMatches] = useState<MatchResponse[]>([]);
+  const [stages, setStages] = useState<StageResponse[]>([]);
   const [predictions, setPredictions] = useState<PredictionResponse[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,12 +82,15 @@ export default function MatchesPage() {
         const activeTournament = await getActiveTournament();
         setTournament(activeTournament);
 
-        const [upcomingMatches, myPredictions] = await Promise.all([
-          getUpcomingMatches(activeTournament.id),
-          getMyPredictions(activeTournament.id, token),
-        ]);
+        const [upcomingMatches, tournamentStages, myPredictions] =
+          await Promise.all([
+            getUpcomingMatches(activeTournament.id),
+            getStagesByTournament(activeTournament.id),
+            getMyPredictions(activeTournament.id, token),
+          ]);
 
         setMatches(upcomingMatches);
+        setStages(tournamentStages);
         setPredictions(myPredictions);
         reportSuccess();
       } catch (loadError) {
@@ -110,14 +129,48 @@ export default function MatchesPage() {
     return new Map(predictions.map((prediction) => [prediction.matchId, prediction]));
   }, [predictions]);
 
-  const matchesByDate = useMemo(() => {
-    return matches.reduce<Map<string, MatchResponse[]>>((groups, match) => {
-      const key = dateKey(match.startsAt);
-      const current = groups.get(key) ?? [];
-      groups.set(key, [...current, match]);
-      return groups;
-    }, new Map());
-  }, [matches]);
+  // El recorrido del torneo lo define el backend: agrupamos por stageId y
+  // respetamos su orderNumber. No se infiere ninguna fase desde el frontend.
+  const stageSections = useMemo(() => {
+    const orderedStages = [...stages].sort(
+      (first, second) => first.orderNumber - second.orderNumber,
+    );
+    const knownStageIds = new Set(orderedStages.map((stage) => stage.id));
+    const matchesByStageId = new Map<string, MatchResponse[]>();
+    const withoutStage: MatchResponse[] = [];
+
+    for (const match of matches) {
+      if (!knownStageIds.has(match.stageId)) {
+        withoutStage.push(match);
+        continue;
+      }
+
+      const current = matchesByStageId.get(match.stageId) ?? [];
+      matchesByStageId.set(match.stageId, [...current, match]);
+    }
+
+    const sections = orderedStages
+      .map((stage) => ({
+        key: stage.id,
+        name: stage.name,
+        type: stage.type,
+        stageMatches: matchesByStageId.get(stage.id) ?? [],
+      }))
+      .filter((section) => section.stageMatches.length > 0);
+
+    // Red de seguridad: si el backend agrega una etapa que todavia no
+    // conocemos, sus partidos se muestran igual en vez de desaparecer.
+    if (withoutStage.length > 0) {
+      sections.push({
+        key: "sin-etapa",
+        name: "Otros partidos",
+        type: "OTHER" as StageTypeValue,
+        stageMatches: withoutStage,
+      });
+    }
+
+    return sections;
+  }, [matches, stages]);
 
   if (loading || !authenticated) {
     return <SessionFallback />;
@@ -172,30 +225,34 @@ export default function MatchesPage() {
           />
         ) : null}
 
-        <div className="flex flex-col gap-10">
-          {Array.from(matchesByDate.entries()).map(([date, dateMatches]) => (
-            <section key={date}>
-              <div className="mb-4 flex items-center gap-4">
-                <h2 className="text-sm font-black uppercase tracking-[0.14em] text-[var(--accent-ink)]">
-                  {date}
-                </h2>
-                <span
-                  aria-hidden="true"
-                  className="h-px flex-1 bg-[linear-gradient(90deg,rgba(191,215,50,0.55)_0%,var(--border)_100%)]"
-                />
-                <span className="text-xs font-bold text-[var(--text-faint)]">
-                  {dateMatches.length}{" "}
-                  {dateMatches.length === 1 ? "partido" : "partidos"}
-                </span>
-              </div>
-              <div className="grid gap-4 xl:grid-cols-2">
-                {dateMatches.map((match) => (
-                  <MatchCard
-                    key={match.id}
-                    match={match}
-                    prediction={predictionsByMatchId.get(match.id)}
-                  />
-                ))}
+        <div className="flex flex-col gap-10 sm:gap-12">
+          {stageSections.map((section, index) => (
+            <section key={section.key}>
+              <StageHeader
+                fallbackName={section.name}
+                matchCount={section.stageMatches.length}
+                position={index + 1}
+                total={stageSections.length}
+                type={section.type}
+              />
+
+              <div className="flex flex-col gap-6">
+                {Array.from(groupByDate(section.stageMatches).entries()).map(
+                  ([date, dateMatches]) => (
+                    <div key={date}>
+                      <h3 className="label-caps mb-3">{date}</h3>
+                      <div className="grid gap-4 xl:grid-cols-2">
+                        {dateMatches.map((match) => (
+                          <MatchCard
+                            key={match.id}
+                            match={match}
+                            prediction={predictionsByMatchId.get(match.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ),
+                )}
               </div>
             </section>
           ))}

@@ -17,6 +17,7 @@ const links = [
   {
     href: "/",
     label: "Inicio",
+    shortLabel: "Inicio",
     icon: (
       <svg className="nav-icon h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
         <rect height="7" width="7" rx="1.5" x="3" y="3" />
@@ -29,6 +30,7 @@ const links = [
   {
     href: "/matches",
     label: "Partidos",
+    shortLabel: "Partidos",
     icon: (
       <svg className="nav-icon h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
         <rect height="18" rx="2" width="18" x="3" y="4" />
@@ -39,6 +41,7 @@ const links = [
   {
     href: "/predictions",
     label: "Mis pronósticos",
+    shortLabel: "Pronósticos",
     hasBadge: true,
     icon: (
       <svg className="nav-icon h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -51,6 +54,7 @@ const links = [
   {
     href: "/ranking",
     label: "Ranking",
+    shortLabel: "Ranking",
     icon: (
       <svg className="nav-icon h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
         <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17M14 14.66V17M8 21h8M6 4h12v7a6 6 0 0 1-12 0V4z" />
@@ -60,6 +64,7 @@ const links = [
   {
     href: "/scores",
     label: "Mis puntos",
+    shortLabel: "Puntos",
     icon: (
       <svg className="nav-icon h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
@@ -131,6 +136,38 @@ export function AppLayout({ children }: AppLayoutProps) {
             {pendingCount}
           </span>
         ) : null}
+      </Link>
+    );
+  });
+
+  // Misma fuente de datos que el sidebar y la tira superior: solo cambia la
+  // presentacion (icono arriba, etiqueta corta) para caber en 5 columnas.
+  const bottomNavLinks = links.map((link) => {
+    const active = isActive(pathname, link.href);
+
+    return (
+      <Link
+        aria-current={active ? "page" : undefined}
+        aria-label={link.label}
+        className={`app-bottom-nav__link${
+          active ? " app-bottom-nav__link--active" : ""
+        }`}
+        href={link.href}
+        key={link.href}
+      >
+        <span className="app-bottom-nav__icon">
+          {link.icon}
+          {link.hasBadge && pendingCount > 0 ? (
+            <span
+              aria-label={`${pendingCount} pronósticos pendientes`}
+              className="app-bottom-nav__badge"
+              role="status"
+            >
+              {pendingCount > 99 ? "99+" : pendingCount}
+            </span>
+          ) : null}
+        </span>
+        <span className="app-bottom-nav__label">{link.shortLabel}</span>
       </Link>
     );
   });
@@ -213,6 +250,12 @@ export function AppLayout({ children }: AppLayoutProps) {
           <div className="app-content">{children}</div>
         </div>
       </div>
+
+      {/* Navegacion inferior: reemplaza a la tira horizontal por debajo de
+          768px, donde las 5 etiquetas largas no entraban sin scroll. */}
+      <nav aria-label="Secciones principales" className="app-bottom-nav">
+        {bottomNavLinks}
+      </nav>
     </main>
   );
 }

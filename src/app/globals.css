@@ -1057,6 +1057,124 @@ input:focus-visible {
   font-weight: 800;
 }
 
+/* Por debajo de 768px las 5 etiquetas largas no entran en la tira: se
+   desbordaban y "Ranking" / "Mis puntos" quedaban fuera de pantalla.
+   Ahi manda la barra inferior. */
+@media (max-width: 767.98px) {
+  .app-nav-mobile {
+    display: none;
+  }
+}
+
+/* ---------- NAVEGACION INFERIOR (SOLO MOBILE) ---------- */
+
+.app-bottom-nav {
+  display: none;
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  align-items: stretch;
+  gap: 2px;
+  border-top: 1px solid var(--border);
+  background: var(--header-bg);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 767.98px) {
+  .app-bottom-nav {
+    display: flex;
+  }
+}
+
+.app-bottom-nav__link {
+  position: relative;
+  display: flex;
+  /* flex-basis 0 reparte el ancho en 5 columnas iguales: ninguna opcion
+     depende del largo de su texto, asi que ninguna queda cortada. */
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  /* Area tactil comoda sin agrandar la barra. */
+  min-height: 52px;
+  border-radius: 14px;
+  padding: 8px 2px 6px;
+  color: var(--text-secondary);
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.app-bottom-nav__link:hover {
+  color: var(--text-primary);
+}
+
+.app-bottom-nav__link--active {
+  background: var(--lime-soft);
+  color: var(--accent-ink);
+  font-weight: 800;
+}
+
+/* Indicador superior: el unico adorno, 3px de lima. */
+.app-bottom-nav__link--active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 22px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--globant-lime);
+  transform: translateX(-50%);
+}
+
+.app-bottom-nav__icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-bottom-nav__label {
+  /* Medida de tab bar nativa: baja a 0.62rem solo en las pantallas mas
+     angostas para que "Pronosticos" entre entero. */
+  font-size: clamp(0.62rem, 2.6vw, 0.7rem);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-bottom-nav__badge {
+  position: absolute;
+  top: -5px;
+  left: 62%;
+  min-width: 17px;
+  border-radius: 999px;
+  border: 1px solid var(--surface);
+  background: var(--accent-ink);
+  padding: 0 4px;
+  color: #ffffff;
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 15px;
+  text-align: center;
+}
+
+/* La barra flota sobre el contenido: se reserva el alto equivalente para
+   que la ultima tarjeta o boton de cada pagina se vea completo. */
+@media (max-width: 767.98px) {
+  .app-content {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* ---------- TARJETAS BLANCAS (ESTILO IMAGEN 1) ---------- */
 
 .brand-card {
