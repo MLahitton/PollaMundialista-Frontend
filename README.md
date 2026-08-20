@@ -52,24 +52,30 @@ Ofrecer una interfaz web simple para que cualquier participante pueda iniciar se
 
 ## 5. Instalación y Configuración
 
+Esto es lo que vas a hacer, en orden:
+
+**Descargar → Instalar → Configurar `.env.local` → Encender el backend → Ejecutar el frontend → Iniciar sesión → Probar.**
+
 ### Paso 1 — Instalar lo necesario
 
 Necesitas tres programas:
 
 - **Git** — para descargar el proyecto.
 - **Node.js 24 o superior** — para poder ejecutar el frontend.
-- **pnpm 11** — para instalar las dependencias del proyecto.
+- **pnpm 11 o superior** — para instalar las dependencias del proyecto.
 
-Descargas oficiales:
+Descargas oficiales (sirven igual en Windows y en Mac):
 
 - Git: https://git-scm.com/downloads
 - Node.js (versión LTS): https://nodejs.org/en/download
 
-Con Node.js ya instalado, instala pnpm:
+Con Node.js ya instalado, instala pnpm una sola vez:
 
 ```bash
 npm install -g pnpm
 ```
+
+> `npm` se usa solo para instalar pnpm. Las dependencias del proyecto siempre se manejan con `pnpm`.
 
 Cierra y vuelve a abrir la terminal, y comprueba que todo quedó bien:
 
@@ -112,7 +118,7 @@ En PowerShell (Windows):
 Copy-Item .env.example .env.local
 ```
 
-En Git Bash / macOS / Linux:
+En Mac / Linux / Git Bash:
 
 ```bash
 cp .env.example .env.local
@@ -128,13 +134,24 @@ NEXT_PUBLIC_GOOGLE_CLIENT_ID=TU_CLIENT_ID.apps.googleusercontent.com
 - `NEXT_PUBLIC_API_BASE_URL`: dirección del backend. Para trabajar en tu computador se deja tal cual viene: `http://localhost:8080`.
 - `NEXT_PUBLIC_GOOGLE_CLIENT_ID`: viene vacío. **Pídeselo al responsable del proyecto.** Debe ser el mismo Client ID de Google que usa el backend, o el login fallará.
 
-`.env.local` no se sube a GitHub (está en `.gitignore`). Nunca pongas contraseñas ni secretos en este archivo: el frontend solo usa estas dos variables.
+Para tenerlo claro:
+
+- `.env.example` es la **plantilla** y sí se sube a GitHub.
+- `.env.local` es **la configuración de tu computador**.
+- `.env.local` **no se sube a GitHub** (está en `.gitignore`).
+
+El frontend solo usa estas dos variables. No pongas contraseñas ni secretos en este archivo.
 
 ---
 
 ### Paso 5 — Encender el backend
 
-Este frontend **no funciona solo**. Antes de continuar, el backend debe estar corriendo en la dirección que pusiste en `NEXT_PUBLIC_API_BASE_URL` (por defecto `http://localhost:8080`).
+Este frontend **no funciona solo**. El backend es el que le entrega los partidos, los pronósticos, los puntos y el ranking.
+
+Antes de continuar, el backend debe estar corriendo en la dirección que pusiste en `NEXT_PUBLIC_API_BASE_URL`:
+
+- Backend: `http://localhost:8080`
+- Frontend: `http://localhost:3000`
 
 Si todavía no lo tienes instalado, sigue la guía de su repositorio:
 https://github.com/MLahitton/PollaMundialista-Backend
@@ -177,6 +194,7 @@ Con la sesión abierta, entra a estas páginas y confirma que cargan datos:
 | Página | Dirección | Qué debe mostrar |
 |---|---|---|
 | Inicio | http://localhost:3000 | Tu nombre y los accesos principales |
+| Inicio de sesión | http://localhost:3000/login | El botón para entrar con Google |
 | Partidos | http://localhost:3000/matches | Los próximos partidos del torneo |
 | Mis pronósticos | http://localhost:3000/predictions | Tus pronósticos guardados |
 | Ranking | http://localhost:3000/ranking | El Top 10 y tu posición |
@@ -186,7 +204,31 @@ Si las páginas cargan sin errores, la instalación está lista.
 
 ---
 
-## 6. Comandos disponibles
+## 6. Verificar el ranking
+
+El ranking muestra a los participantes que **ya tienen partidos puntuados**. Si todavía nadie tiene puntos, la página aparece vacía.
+
+Para que aparezcan datos se necesitan tres cosas:
+
+1. Que el backend esté encendido.
+2. Que el reloj del backend esté en una fecha en la que **ya se haya jugado al menos un partido**.
+3. Que el proceso de puntuación (scoring) del backend se haya ejecutado.
+
+Durante una simulación, el backend usa un reloj controlado para avanzar por las fechas del Mundial. Si ese reloj está antes de un partido, ese partido todavía no aparece como terminado y todavía no genera puntos para el ranking.
+
+Por eso:
+
+- Si el reloj está **antes del inicio del Mundial**, es **normal** que el ranking aparezca vacío. No es un error del frontend.
+- Si el reloj avanza y ya hay partidos terminados, el backend debe procesar esos partidos para que los puntos aparezcan en el ranking.
+- En una simulación del Mundial, el ranking se va llenando poco a poco a medida que se avanzan los partidos y se ejecuta el scoring.
+
+> El reloj y el proceso de scoring se controlan **desde el backend**, no desde el frontend.
+
+**Si el ranking aparece vacío:** revisa primero que el backend esté encendido, que el reloj esté después de algún partido y que el scoring haya sido ejecutado.
+
+---
+
+## 7. Comandos disponibles
 
 | Comando | Qué hace |
 |---|---|
@@ -197,7 +239,56 @@ Si las páginas cargan sin errores, la instalación está lista.
 
 ---
 
-## 7. Problemas frecuentes
+## 8. Estructura del Proyecto
+
+```
+PollaMundialista-Frontend/
+├── public/
+├── src/
+│   ├── app/
+│   ├── components/
+│   ├── features/
+│   ├── lib/
+│   └── types/
+├── .env.example
+├── next.config.ts
+└── package.json
+```
+
+| Carpeta | Qué contiene |
+|---|---|
+| `src/app` | Páginas y rutas de la aplicación: `/`, `/login`, `/matches`, `/predictions`, `/ranking` y `/scores` |
+| `src/components` | Componentes reutilizables de la interfaz: tarjetas de partido, formularios, avisos y menú |
+| `src/features` | Funcionalidades organizadas por módulo: autenticación, partidos, pronósticos, ranking, puntos y torneos |
+| `src/lib` | Lógica compartida: la conexión con el backend y la lectura de las variables de entorno |
+| `src/types` | Definiciones de tipos que usa el proyecto |
+| `public` | Imágenes y archivos públicos |
+
+---
+
+## 9. ¿Qué hace cada archivo?
+
+Solo los archivos que conviene conocer al empezar:
+
+| Archivo | Para qué sirve |
+|---|---|
+| `package.json` | Contiene los scripts (`dev`, `build`, `start`, `lint`) y las dependencias del proyecto |
+| `pnpm-lock.yaml` | Guarda las versiones exactas de las dependencias |
+| `pnpm-workspace.yaml` | Autoriza la compilación de `unrs-resolver` durante la instalación |
+| `.env.example` | Plantilla de las variables necesarias para ejecutar el proyecto |
+| `next.config.ts` | Configuración de Next.js |
+| `eslint.config.mjs` | Reglas de ESLint para revisar el código |
+| `tsconfig.json` | Configuración de TypeScript |
+| `postcss.config.mjs` | Configuración de estilos (Tailwind CSS) |
+| `src/app/layout.tsx` | Estructura general de la aplicación |
+| `src/app/page.tsx` | Página de inicio |
+| `src/app/globals.css` | Estilos globales |
+| `src/lib/config/env.ts` | Lee la dirección del backend y el Client ID de Google |
+| `src/lib/api/api-client.ts` | Hace las llamadas al backend |
+
+---
+
+## 10. Problemas frecuentes
 
 | Problema | Solución |
 |---|---|
@@ -206,11 +297,14 @@ Si las páginas cargan sin errores, la instalación está lista.
 | El botón de Google no aparece | Falta `NEXT_PUBLIC_GOOGLE_CLIENT_ID` en `.env.local`, o no reiniciaste `pnpm dev` después de editarlo |
 | El login con Google falla | El Client ID no es el mismo que usa el backend, o no estás en `http://localhost:3000` |
 | Aviso de "sin conexión" o páginas vacías | El backend no está encendido en `http://localhost:8080` |
+| El ranking aparece vacío | Verifica que el backend esté encendido, que el reloj esté después de algún partido y que el scoring haya sido ejecutado |
 | El puerto 3000 está ocupado | Cierra el otro programa que lo use; conviene mantener el 3000 por el login de Google |
 
 > Después de cambiar `.env.local`, detén el servidor con `Ctrl + C` y vuelve a ejecutar `pnpm dev`.
 
-## 20. Autores
+---
+
+## 11. Autores
 
 Proyecto desarrollado por:
 
